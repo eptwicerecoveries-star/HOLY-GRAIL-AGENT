@@ -1038,6 +1038,12 @@ touching any caller.
 Each phase is complete (tests + logging + docs + error handling, per CLAUDE.md) before the
 next starts. No phase modifies modules outside its own boundary.
 
+> **Implementation status.** Phases 0–3 are complete. Phase 2 grew into three sub-phases
+> (2A extraction, 2B interpretation, 2C OCR and county profile learning) once real county
+> PDFs showed the work was larger than one phase; see
+> `docs/architecture/PHASE2_PARSER_DESIGN.md` and `PHASE3_CLASSIFIER_DESIGN.md` for what the
+> corpus changed about the design. Phase 4 (compliance) is next.
+
 **Phase 0 — Foundations**
 Repo scaffold, `pyproject.toml`, `utils/config.py`, `utils/logging_config.py`, base
 exception hierarchy, Postgres + Alembic wiring, `docker-compose.yml`, CI (lint/type/test),

@@ -19,11 +19,15 @@ if TYPE_CHECKING:
 class RawSurplusRow(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     __tablename__ = "raw_surplus_rows"
 
-    ingestion_job_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    # Both nullable: a document can be read and stored before it is attributed to a
+    # county or arrives through a scheduled job. The parsed document is the real parent of
+    # a row, and requiring a job here would mean either inventing one or refusing to store
+    # a file someone parsed by hand.
+    ingestion_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), index=True
     )
-    county_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("counties.id", ondelete="CASCADE"), nullable=False, index=True
+    county_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("counties.id", ondelete="CASCADE"), index=True
     )
     parsed_document_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("parsed_documents.id", ondelete="SET NULL"), index=True
@@ -41,5 +45,5 @@ class RawSurplusRow(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     extraction_strategy: Mapped[str | None] = mapped_column(String(100))
     extraction_confidence: Mapped[float | None] = mapped_column(Float)
 
-    ingestion_job: Mapped[IngestionJob] = relationship(back_populates="raw_rows")
-    county: Mapped[County] = relationship()
+    ingestion_job: Mapped[IngestionJob | None] = relationship(back_populates="raw_rows")
+    county: Mapped[County | None] = relationship()

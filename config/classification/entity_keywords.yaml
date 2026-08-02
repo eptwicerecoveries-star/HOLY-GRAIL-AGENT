@@ -1,0 +1,137 @@
+# Vocabulary for deciding what kind of party an owner name refers to.
+#
+# Matched against the name after normalization (casefold, punctuation stripped, whitespace
+# collapsed), as whole words. Whole-word matching matters: "INC" must not fire on
+# "VINCENT", and "CO" must not fire on "COOPER".
+#
+# Add wordings here rather than in code. A suffix learned from one county then helps every
+# county that follows, which is the same mechanism the column aliases use.
+
+company_markers:
+  - llc
+  - l l c
+  - inc
+  - incorporated
+  - corp
+  - corporation
+  - co
+  - company
+  - ltd
+  - limited
+  - lp
+  - llp
+  - lllp
+  - pllc
+  - pc
+  - plc
+  - partners
+  - partnership
+  - properties
+  - property
+  - holdings
+  - holding
+  - investments
+  - investment
+  - capital
+  - group
+  - enterprises
+  - associates
+  - association
+  - management
+  - realty
+  - development
+  - developers
+  - builders
+  - construction
+  - bank
+  - mortgage
+  - lending
+  - financial
+  - finance
+  - services
+  - solutions
+  - ventures
+  - acquisitions
+  - assets
+  - fund
+  - funding
+  - institute
+  - church
+  - ministries
+  - foundation
+  - club
+  - lodge
+  - farms
+  - lien
+  - auction
+
+trust_markers:
+  - trust
+  - trustee
+  - trustees
+  - living trust
+  - revocable trust
+  - irrevocable trust
+  - family trust
+  - trust agreement
+
+estate_markers:
+  - estate
+  - estate of
+  - deceased
+  - heirs
+  - heirs of
+  - executor
+  - executrix
+  - administrator of
+  - personal representative
+  - life tenant
+
+government_markers:
+  - county
+  - city of
+  - town of
+  - township
+  - state of
+  - united states
+  - department of
+  - board of
+  - commission
+  - commissioners
+  - authority
+  - municipal
+  - municipality
+  - school district
+  - housing authority
+  - redevelopment
+  - treasurer
+  - sheriff
+
+# Suffixes that belong to a person's name and must not be read as anything else.
+person_suffixes:
+  - jr
+  - sr
+  - ii
+  - iii
+  - iv
+  - v
+  - md
+  - phd
+  - esq
+
+# Which kinds of owner are worth pursuing. The brief says to remove companies and keep
+# individuals; estates and trusts are a deliberate third answer rather than a rounding of
+# one into the other.
+#
+# An estate is often the most valuable lead of all: the owner has died, the heirs are
+# entitled to the money, and they are frequently unaware it exists. Discarding estates as
+# "not an individual" would throw those away. A trust is similar -- there is a human
+# trustee to contact. Both are pursued by default and both are flagged so a caller knows
+# they are approaching a representative rather than the owner.
+pursue:
+  individual: true
+  estate: true
+  trust: true
+  company: false
+  government: false
+  unknown: false

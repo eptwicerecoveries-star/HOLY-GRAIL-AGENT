@@ -118,6 +118,37 @@ Profiles are append-only. A changed fingerprint means the county changed its lay
 is worth looking at: it is exactly the moment a pinned `surplus_column` can start pointing
 at a column that no longer exists.
 
+## 7. Check who the owners are
+
+```bash
+surplusai classify document path/to/county.pdf --state <xx> --county <county-slug>
+```
+
+Reports how many owners are worth contacting and what the rest are. A tax sale of occupied
+property is mostly individuals; a lien auction is mostly companies, and a county that is
+overwhelmingly companies will yield few leads however many rows it has.
+
+Estates and trusts count as pursuable and are reported separately. That is deliberate: an
+estate has heirs entitled to the money who often do not know it exists, so discarding it as
+"not an individual" would lose the best kind of lead there is.
+
+Any owner reported `unknown` is a name that could not be read — common after OCR. It is
+stored but never called.
+
+## 8. Store the result
+
+```bash
+surplusai parser ingest path/to/county.pdf --state <xx> --county <county-slug>
+surplusai parser review list
+```
+
+`ingest` writes the document, every row, the column mappings, and a queue entry for any row
+that cannot be worked unattended. Re-running on the same file changes nothing: identity is
+the file's contents, not its name.
+
+Work the queue with `parser review resolve <id> --by <name>`. Resolving closes the work item
+and never alters the extracted row.
+
 ## What must never be done
 
 - **Do not compute a surplus** from a bid minus a debt. Liens, fees and costs are paid
@@ -129,3 +160,10 @@ at a column that no longer exists.
   gross figure, which is the one already paid back.
 - **Do not add county-specific branching to parser code.** If a county cannot be onboarded
   through configuration, that is a gap in the generic path worth fixing for everyone.
+- **Do not treat an estate or a trust as a company.** They are pursuable by default because
+  there is a person to contact and money they are entitled to. If a county's estates should
+  not be worked, change `pursue` in `config/classification/entity_keywords.yaml` rather than
+  reclassifying them.
+- **Do not add short entity markers that collide with surnames.** Markers match whole words,
+  but a marker like `an` or `de` would still fire on real names. When in doubt, prefer a
+  longer, unambiguous form.

@@ -12,6 +12,7 @@ from surplus_ai.database.models.interaction import Interaction
 from surplus_ai.database.models.lead import Lead
 from surplus_ai.database.models.lead_score import LeadScore
 from surplus_ai.database.models.owner import Owner
+from surplus_ai.database.models.parse_review_item import ParseReviewItem
 from surplus_ai.database.models.parsed_document import ParsedDocument
 from surplus_ai.database.models.parsing_profile import ParsingProfileVersion
 from surplus_ai.database.models.property import Property
@@ -36,6 +37,7 @@ __all__ = [
     "Lead",
     "LeadScore",
     "Owner",
+    "ParseReviewItem",
     "ParsedDocument",
     "ParsingProfileVersion",
     "Property",

@@ -4,16 +4,18 @@ An operating system for a surplus funds recovery business: county surplus PDFs i
 qualified leads out. See `PROJECT.md` for the mission and `ARCHITECTURE.md` for the full
 design and phase roadmap.
 
-**Current status: Phase 1 and all of Phase 2 (2A extraction, 2B interpretation,
-2C OCR and profile learning) complete.**
+**Current status: Phases 1, 2 and 3 complete.**
 
 Implemented: configuration, logging, the database schema and migrations, the `surplusai db`
 CLI, county-agnostic PDF extraction including OCR for scanned tables, interpretation of a
-county's own columns onto a universal schema including the surplus rule, and append-only
-county profile learning.
+county's own columns onto a universal schema including the surplus rule, append-only county
+profile learning, persistence with a reviewer work queue, leave-one-out evaluation, and
+owner classification.
 
-Not yet implemented: everything from owner classification onward (Phase 3 and later), plus
-two Phase 2 follow-ups noted at the end of this file.
+Not yet implemented: compliance rules (Phase 4) and everything after.
+
+The whole pipeline in one number: **2,012 extracted rows across the corpus become 141
+actual leads** — rows where the county holds money *and* the owner is worth contacting.
 
 ---
 
@@ -77,6 +79,15 @@ surplusai parser interpret data/test_pdfs/Harford_County_MD.pdf
 surplusai parser interpret data/test_pdfs/Marion_County_IN_2023.pdf --state in --county marion
 
 surplusai parser profile data/test_pdfs/Marion_County_IN_2023.pdf --slug marion --state in --county marion
+
+surplusai parser ingest data/test_pdfs/Harford_County_MD.pdf    # parse, interpret and store
+surplusai parser review list                                    # rows needing a person
+surplusai parser review resolve <id> --by alex --notes "checked"
+surplusai parser evaluate                                       # corpus-wide totals
+surplusai parser evaluate --state in --holdout marion --holdout-pdf data/test_pdfs/Marion_County_IN_2023.pdf
+
+surplusai classify name "ESTATE OF JERIMIAH GILBERT"
+surplusai classify document data/test_pdfs/Harford_County_MD.pdf
 ```
 
 `db init` and `db seed` are both idempotent — running them repeatedly is safe.
@@ -226,28 +237,82 @@ both dropped rows and repeated header rows miscounted as data.
 surplus_ai/
     cli/          Typer CLI (surplusai)
     database/     ORM models, engine/session, Alembic migrations, seed data
+    classifier/   owner type rules, entity vocabulary, name splitting
     parser/       document classification, extraction strategies, quality scoring,
-                  header reconstruction, multi-page stitching, pipeline
+                  header reconstruction, multi-page stitching, persistence, evaluation
       interpretation/  canonical schema, alias registry, type inference,
                        surplus resolution, confidence and routing
+      profiles/        append-only county profile learning and priors
     utils/        settings, logging, base exceptions
 tests/
     unit/         fast tests, transaction-rolled-back DB access, corpus parser tests
     integration/  full CLI + migration lifecycle against a real database
-config/parsing/   field aliases, surplus vocabulary, confidence thresholds
-config/counties/  per-county overrides, added without touching code
+config/parsing/        field aliases, surplus vocabulary, confidence thresholds
+config/counties/       per-county overrides, added without touching code
+config/classification/ entity vocabulary and which owner kinds to pursue
 data/test_pdfs/   county PDF corpus plus golden expectations
 docs/             architecture decisions and runbooks
 ```
 
+### Owner classification
+
+Every owner name is classified as an individual, company, estate, trust, government body,
+or unknown. The brief asks to remove companies and keep individuals; two decisions go
+beyond that and are worth stating.
+
+**Estates and trusts are kept, not discarded.** `ESTATE OF JERIMIAH GILBERT` is not a
+company, and it is arguably the most valuable lead there is: the owner has died, the heirs
+are entitled to the money, and they are frequently unaware it exists. A trust has a human
+trustee to contact. Folding either into "not an individual" would silently discard good
+leads, so both are their own answer and both are pursued by default. Which kinds are
+pursued is set in `config/classification/entity_keywords.yaml`, because it is a commercial
+decision rather than a fact about the name.
+
+**Markers match whole words only.** Substring matching would read `inc` inside `VINCENT`,
+`co` inside `COOPER` and `lp` inside `ALPERT`, turning three real people into businesses.
+That is the expensive direction of error: an excluded person is a lead lost silently,
+whereas an included company is one wasted call.
+
+Names that cannot be read — recognition leaves fragments like `&` and `| &` — become
+`unknown` at zero confidence. They are recorded rather than deleted, which keeps them off a
+call list without losing the record.
+
+The two counties in the corpus have opposite shapes, which is why both are tested: Calvert
+is a tax sale of occupied property and is mostly individuals, while Marion is a lien
+auction and is 82% companies.
+
+### Storing results and the review queue
+
+`parser ingest` writes the document, every row verbatim, how each column was interpreted,
+and a queue entry for any row that may not be worked unattended. Re-ingesting the same file
+is a no-op: identity comes from the file's contents rather than its name, because counties
+republish the same list under new filenames.
+
+A queued row is a work item, not a quarantined record — it is stored either way, and
+resolving it never alters the extracted data. Each entry says plainly why it is there.
+
+### Measuring generalisation
+
+The corpus proves the pipeline reads the counties it has seen, which is not the same as
+proving it generalises — a rule tuned until one county passes will pass that county forever.
+`parser evaluate --holdout` re-runs a county with its configuration withheld and checks two
+things:
+
+- **Row counts must not change.** Configuration says what columns *mean*; if withholding it
+  changed how many rows came back, county knowledge would have leaked into extraction.
+- **Surplus may degrade, but never invent.** Cold, Marion reports `ambiguous` instead of
+  `county_config` — it refuses rather than picking one of its three overbid columns. A cold
+  run naming a column the configured run did not would be a guess, and fails the check.
+
 ## Known follow-ups
 
-Two items from the Phase 2 design are deliberately not built yet:
-
-- **A persisted review queue.** Rows routed to `review` or `quarantine` are labelled and
-  returned, but there is no table backing a reviewer workflow. Nothing is lost in the
-  meantime — the routing decision travels with every row.
-- **Leave-one-out evaluation.** The corpus proves the pipeline works on the counties it has
-  seen. A harness that re-runs a county with its own profile and contributed aliases
-  excluded would measure cold-start accuracy directly, which is the sharper guard against
-  overfitting as the corpus grows.
+- **A trained owner classifier.** Classification is rule-based and config-driven, which is
+  what the corpus supports. ARCHITECTURE.md places a trained model in Phase 12, once enough
+  reviewed names have accumulated to train on; the interface already carries a `method`
+  field so a model can be added alongside the rules rather than replacing them.
+- **Owner rows are not yet written.** Classification runs over parsed documents and via the
+  CLI, but nothing persists to the `owners` table. That belongs with lead creation, which
+  is Phase 5.
+- **Suite runtime.** The corpus tests parse a 49-page and a 55-page county repeatedly, so a
+  full `pytest` run takes several minutes. Module-scoped fixtures already avoid the worst of
+  it; caching parsed results across modules would cut it further.

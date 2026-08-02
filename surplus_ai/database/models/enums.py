@@ -81,6 +81,22 @@ class MappingMethodType(str, Enum):
     UNRESOLVED = "unresolved"
 
 
+class RoutingDecisionType(str, Enum):
+    """What may be done with a parsed row without a person looking at it first."""
+
+    AUTO_ACCEPT = "auto_accept"
+    REVIEW = "review"
+    QUARANTINE = "quarantine"
+
+
+class ReviewStatus(str, Enum):
+    """Where a queued row stands in the reviewer workflow."""
+
+    PENDING = "pending"
+    RESOLVED = "resolved"
+    REJECTED = "rejected"
+
+
 class SurplusCaseStatus(str, Enum):
     NEW = "new"
     NORMALIZED = "normalized"
