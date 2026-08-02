@@ -1,0 +1,35 @@
+# Composite confidence and how it routes a row.
+#
+# Nothing is ever discarded by these thresholds. They decide whether a row can be used
+# without a person looking at it, not whether it survives.
+
+weights:
+  document_classification: 0.15
+  extraction_quality: 0.35
+  header_confidence: 0.20
+  column_mapping: 0.30
+
+# Confidence assigned to a column mapping by the method that resolved it.
+method_confidence:
+  county_override: 1.00
+  exact_alias: 0.95
+  # An exact hit on the surplus vocabulary, which is matched whole and never fuzzily.
+  surplus_explicit: 0.95
+  fuzzy_alias: 0.75
+  value_inference: 0.60
+  unresolved: 0.00
+
+# Minimum similarity for a fuzzy alias match to be accepted at all. Below this a column is
+# left unresolved and preserved rather than guessed at.
+fuzzy_threshold: 88.0
+
+routing:
+  auto_accept: 0.85
+  review: 0.50
+  # Anything below `review` is quarantined: stored, flagged, and excluded from downstream
+  # use until a person resolves it.
+
+# Rows whose values came from OCR never auto-accept, whatever the composite score says. A
+# single misread digit in a money field is expensive, and OCR confidence is not a reliable
+# guide to that specific failure.
+ocr_caps_routing_at_review: true

@@ -5,12 +5,21 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    Boolean,
+    Date,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from surplus_ai.database.base import Base
-from surplus_ai.database.models.enums import SurplusCaseStatus, pg_enum
+from surplus_ai.database.models.enums import SurplusCaseStatus, SurplusSourceType, pg_enum
 from surplus_ai.database.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
@@ -44,7 +53,31 @@ class SurplusCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Nullable by design: many counties publish sale/bid/assessment figures but never state
     # a surplus. Inferring one arithmetically would manufacture a lead, so absence is
     # recorded as NULL and consumers must treat NULL as "not a qualified lead", never zero.
+    # A published 0.00 is different again: it is a real figure meaning nothing is left.
     surplus_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    surplus_is_explicit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    surplus_source: Mapped[SurplusSourceType] = mapped_column(
+        pg_enum(SurplusSourceType, "surplus_source_type"),
+        nullable=False,
+        default=SurplusSourceType.ABSENT,
+        index=True,
+    )
+    surplus_source_column: Mapped[str | None] = mapped_column(String(300))
+
+    # Every other published money figure keeps its own column. Collapsing them would lose
+    # the distinction between a gross bid, an amount already refunded, and money still held.
+    sale_amount_published: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    winning_bid: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    opening_bid: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    assessed_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    appraised_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    taxes_due: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    fees_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    face_value_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    overbid_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    purchase_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    refunded_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    remaining_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     distribution_deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[SurplusCaseStatus] = mapped_column(
         pg_enum(SurplusCaseStatus, "surplus_case_status"),

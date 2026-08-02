@@ -5,6 +5,7 @@ from surplus_ai.database.models.compliance_evaluation import ComplianceEvaluatio
 from surplus_ai.database.models.contact import Contact
 from surplus_ai.database.models.county import County
 from surplus_ai.database.models.deal import Deal
+from surplus_ai.database.models.document_column_mapping import DocumentColumnMapping
 from surplus_ai.database.models.export_batch import ExportBatch
 from surplus_ai.database.models.ingestion_job import IngestionJob
 from surplus_ai.database.models.interaction import Interaction
@@ -28,6 +29,7 @@ __all__ = [
     "Contact",
     "County",
     "Deal",
+    "DocumentColumnMapping",
     "ExportBatch",
     "IngestionJob",
     "Interaction",

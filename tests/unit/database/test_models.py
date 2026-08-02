@@ -19,12 +19,14 @@ from surplus_ai.database.models import (
     Contact,
     County,
     Deal,
+    DocumentColumnMapping,
     ExportBatch,
     IngestionJob,
     Interaction,
     Lead,
     LeadScore,
     Owner,
+    ParsedDocument,
     ParsingProfileVersion,
     Property,
     RawSurplusRow,
@@ -43,10 +45,13 @@ from surplus_ai.database.models.enums import (
     IngestionJobStatus,
     InteractionType,
     LeadStatus,
+    MappingMethodType,
     OwnerType,
+    PdfType,
     PublishingFrequency,
     ResearchStatus,
     SurplusCaseStatus,
+    SurplusSourceType,
     UserRole,
 )
 
@@ -59,6 +64,7 @@ EXPECTED_TABLES = {
     "contacts",
     "counties",
     "deals",
+    "document_column_mappings",
     "export_batches",
     "ingestion_jobs",
     "interactions",
@@ -102,7 +108,7 @@ def _case(county: County, **overrides: object) -> SurplusCase:
 
 def test_all_tables_are_registered() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 21
+    assert len(EXPECTED_TABLES) == 22
 
 
 def test_schema_matches_models(engine, _schema) -> None:  # type: ignore[no-untyped-def]
@@ -517,5 +523,138 @@ def test_deal_is_one_to_one_with_lead(session: Session) -> None:
     session.flush()
     session.add(Deal(lead_id=lead.id))
 
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_surplus_provenance_round_trips(session: Session) -> None:
+    """A null surplus must record *why* it is null, not merely that it is.
+
+    "The county published none" and "several columns rivalled each other and we refused to
+    guess" are different facts that lead to different follow-up, so the reason is stored.
+    """
+    county = _county()
+    session.add(county)
+    session.flush()
+    case = _case(
+        county,
+        surplus_amount=None,
+        surplus_is_explicit=False,
+        surplus_source=SurplusSourceType.AMBIGUOUS,
+        surplus_source_column=None,
+    )
+    session.add(case)
+    session.flush()
+    session.expire(case)
+
+    assert case.surplus_amount is None
+    assert case.surplus_source is SurplusSourceType.AMBIGUOUS
+    assert case.surplus_is_explicit is False
+
+
+def test_surplus_source_defaults_to_absent(session: Session) -> None:
+    county = _county()
+    session.add(county)
+    session.flush()
+    case = _case(county, surplus_amount=None)
+    session.add(case)
+    session.flush()
+    session.expire(case)
+
+    assert case.surplus_source is SurplusSourceType.ABSENT
+
+
+def test_every_published_money_column_persists_separately(session: Session) -> None:
+    """Marion's five money figures must survive as five distinct values."""
+    county = _county()
+    session.add(county)
+    session.flush()
+    case = _case(
+        county,
+        surplus_amount=Decimal("0.00"),
+        surplus_is_explicit=True,
+        surplus_source=SurplusSourceType.COUNTY_CONFIG,
+        surplus_source_column="Remaining Overbid",
+        face_value_amount=Decimal("5118.74"),
+        overbid_amount=Decimal("3203.00"),
+        purchase_amount=Decimal("8321.74"),
+        refunded_amount=Decimal("3203.00"),
+        remaining_amount=Decimal("0.00"),
+    )
+    session.add(case)
+    session.flush()
+    session.expire(case)
+
+    assert case.face_value_amount == Decimal("5118.74")
+    assert case.overbid_amount == Decimal("3203.00")
+    assert case.purchase_amount == Decimal("8321.74")
+    assert case.refunded_amount == Decimal("3203.00")
+    assert case.remaining_amount == Decimal("0.00")
+    assert case.surplus_amount == Decimal("0.00")
+    assert case.surplus_source_column == "Remaining Overbid"
+
+
+def test_document_column_mapping_records_its_evidence(session: Session) -> None:
+    county = _county()
+    session.add(county)
+    session.flush()
+    document = ParsedDocument(
+        county_id=county.id,
+        source_file_path="/data/x.pdf",
+        source_file_sha256="c" * 64,
+        page_count=1,
+        pdf_type=PdfType.SEARCHABLE,
+        ocr_required=False,
+    )
+    session.add(document)
+    session.flush()
+
+    session.add(
+        DocumentColumnMapping(
+            parsed_document_id=document.id,
+            table_index=0,
+            column_position=3,
+            original_header="ACCT #",
+            canonical_field="parcel_id",
+            method=MappingMethodType.EXACT_ALIAS,
+            confidence=0.95,
+            evidence="exact match in the global alias registry",
+        )
+    )
+    session.flush()
+
+    stored = session.scalars(select(DocumentColumnMapping)).one()
+    assert stored.original_header == "ACCT #"
+    assert stored.canonical_field == "parcel_id"
+    assert stored.method is MappingMethodType.EXACT_ALIAS
+
+
+def test_column_mapping_is_unique_per_position(session: Session) -> None:
+    county = _county()
+    session.add(county)
+    session.flush()
+    document = ParsedDocument(
+        county_id=county.id,
+        source_file_path="/data/y.pdf",
+        source_file_sha256="d" * 64,
+        page_count=1,
+        pdf_type=PdfType.SEARCHABLE,
+        ocr_required=False,
+    )
+    session.add(document)
+    session.flush()
+
+    for _ in range(2):
+        session.add(
+            DocumentColumnMapping(
+                parsed_document_id=document.id,
+                table_index=0,
+                column_position=1,
+                original_header="Owner",
+                canonical_field="owner_name",
+                method=MappingMethodType.EXACT_ALIAS,
+                confidence=0.95,
+            )
+        )
     with pytest.raises(IntegrityError):
         session.flush()

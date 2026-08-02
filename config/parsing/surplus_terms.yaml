@@ -1,0 +1,94 @@
+# Vocabulary governing which published column, if any, is claimable surplus funds.
+#
+# This is the highest-risk configuration in the system. Labelling a sale price or an
+# already-refunded amount as surplus manufactures a lead against money that is not owed,
+# so every rule here is biased towards saying "unknown" rather than guessing.
+#
+# Three rules, in order of authority:
+#   1. denied_terms can never become surplus_amount, by any path, at any confidence.
+#   2. explicit_terms are matched EXACTLY against the normalized header. Fuzzy matching is
+#      disabled for surplus, because "sale amount" and "surplus amount" are close enough
+#      in token overlap to be confused by any similarity measure.
+#   3. ambiguity_tokens detect the case where several columns lay claim to the same idea.
+#      If more than one column contains the same token, no column is chosen: the county is
+#      marked ambiguous and must be settled in its own config file.
+#
+# Marion County IN is why rule 3 exists. It publishes Overbid, Refunded Overbid and
+# Remaining Overbid. Exact matching alone would pick the gross Overbid, which for a
+# redeemed parcel has already been paid back to the bidder in full -- the county holds
+# nothing. Only Remaining Overbid is still claimable.
+
+explicit_terms:
+  - surplus
+  - surplus amount
+  - surplus funds
+  - surplus balance
+  - excess
+  - excess funds
+  - excess proceeds
+  - excess amount
+  - overage
+  - overages
+  - overage amount
+  - overplus
+  - overbid
+  - balance of bid
+  - balance due owner
+  - funds due owner
+  - due former owner
+  - unclaimed surplus
+  - unclaimed funds
+
+# Tokens that signal several columns may be describing variants of one amount. Presence in
+# more than one published header makes the county ambiguous until its config settles it.
+ambiguity_tokens:
+  - surplus
+  - excess
+  - overage
+  - overbid
+  - overplus
+
+# Never surplus, whatever else matches. These are gross figures, inputs to a sale, or money
+# that has already left the county's hands.
+denied_terms:
+  - sale amount
+  - amount of sale
+  - sale price
+  - sold amount
+  - sold for
+  - purchase price
+  - purchase amount
+  - total purchase
+  - bid
+  - bid amount
+  - winning bid
+  - high bid
+  - highest bid
+  - successful bid
+  - final bid
+  - opening bid
+  - minimum bid
+  - starting bid
+  - upset price
+  - assessment
+  - assessed value
+  - assessed amount
+  - appraised value
+  - appraisal
+  - market value
+  - taxes due
+  - tax due
+  - taxes owed
+  - delinquent taxes
+  - judgment
+  - judgment amount
+  - face value
+  - face value amount
+  - face amount
+  - refunded
+  - refunded overbid
+  - refunded amount
+  - amount refunded
+  - fees
+  - costs
+  - court costs

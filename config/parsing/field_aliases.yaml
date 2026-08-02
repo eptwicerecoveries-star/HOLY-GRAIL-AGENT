@@ -1,0 +1,261 @@
+# Global alias registry: canonical field -> the column labels counties actually publish.
+#
+# Aliases are matched after normalization (casefold, punctuation stripped, "#" and "no."
+# expanded to "number", whitespace collapsed), so "ACCT #", "Acct. No." and "account
+# number" all reduce to the same key. Add new spellings here rather than in code; a label
+# learned from one county then helps every county that follows.
+#
+# surplus_amount is deliberately NOT listed here. Its vocabulary lives in
+# surplus_terms.yaml and is matched by exact rule only, never fuzzily.
+
+parcel_id:
+  - parcel id
+  - parcel number
+  - parcel no
+  - parcel
+  - tax parcel
+  - tax parcel id
+  - tax map id
+  - tax map number
+  - account number
+  - account
+  - acct number
+  - acct
+  - property id
+  - property number
+  - pin
+  - apn
+  - assessors parcel number
+  - folio
+  - folio number
+
+case_number:
+  - case number
+  - case no
+  - case
+  - cause number
+  - court case number
+  - docket number
+  - civil action number
+
+certificate_number:
+  - certificate number
+  - certificate no
+  - cert number
+  - tax certificate number
+  - lien certificate number
+
+unique_id:
+  - unique number
+  - unique id
+  - item number
+  - item no
+  - sequence number
+  - line number
+  - record number
+
+tax_year:
+  - tax year
+  - tax sale year
+  - sale year
+  - year
+  - assessment year
+  - levy year
+
+owner_name:
+  - owner
+  - owner name
+  - property owner
+  - property owner name
+  - property owner at time of sale
+  - owner at time of sale
+  - record owner
+  - former owner
+  - taxpayer
+  - taxpayer name
+  - name
+  - names
+  - entity name
+  - defendant
+  - grantor
+  - last known owner
+
+owner_mailing_address:
+  - owner address
+  - owner mailing address
+  - mailing address
+  - last known address
+  - address of record
+  - owner last known address
+
+purchaser_name:
+  - purchaser
+  - purchaser name
+  - buyer
+  - buyer name
+  - successful bidder
+  - winning bidder
+  - certificate holder
+  - grantee
+
+property_address:
+  - property address
+  - situs address
+  - situs
+  - location
+  - property location
+  - site address
+  - street address
+  - address
+
+property_city:
+  - city
+  - property city
+  - municipality
+  - town
+
+property_zip:
+  - zip
+  - zip code
+  - postal code
+
+legal_description:
+  - legal description
+  - legal
+  - description
+  - brief legal
+  - property description
+
+sale_date:
+  - sale date
+  - date of sale
+  - sold date
+  - tax sale date
+  - auction date
+  - date sold
+
+foreclosure_date:
+  - foreclosure date
+  - date of foreclosure
+  - date of judgment
+  - judgment date
+
+redemption_deadline:
+  - redemption deadline
+  - redemption date
+  - redemption expiration
+  - last day to redeem
+  - redeem by
+
+claim_deadline:
+  - claim deadline
+  - claim by
+  - last day to claim
+  - deadline to file claim
+  - funds expire
+  - escheat date
+
+sale_amount:
+  - sale amount
+  - amount of sale
+  - sold amount
+  - sale price
+  - sold for
+  - purchase price
+  - total sale
+
+winning_bid:
+  - bid amount
+  - winning bid
+  - high bid
+  - highest bid
+  - successful bid
+  - bid
+  - final bid
+
+opening_bid:
+  - opening bid
+  - minimum bid
+  - starting bid
+  - upset price
+  - opening amount
+
+judgment_amount:
+  - judgment amount
+  - judgment
+  - amount of judgment
+  - total judgment
+  - debt amount
+
+assessed_value:
+  - assessment
+  - assessed value
+  - assessed amount
+  - total assessment
+  - assessed valuation
+
+appraised_value:
+  - appraised value
+  - appraisal
+  - appraised amount
+  - market value
+  - fair market value
+
+taxes_due:
+  - taxes due
+  - tax due
+  - taxes owed
+  - delinquent taxes
+  - total taxes
+  - tax amount
+
+fees_amount:
+  - fees
+  - fee
+  - costs
+  - court costs
+  - administrative fee
+  - total fees
+
+face_value_amount:
+  - face value
+  - face value amount
+  - face amount
+
+overbid_amount:
+  - overbid
+  - over bid
+  - overbid amount
+  - bid overage
+
+purchase_amount:
+  - purchase amount
+  - total purchase
+  - purchase total
+
+refunded_amount:
+  - refunded overbid
+  - refunded
+  - refund
+  - amount refunded
+  - refunded amount
+
+remaining_amount:
+  - remaining overbid
+  - remaining
+  - balance remaining
+  - amount remaining
+  - remaining amount
+  - unclaimed balance
+
+parcel_status:
+  - parcel status
+  - status
+  - sale status
+  - disposition
+
+notes:
+  - notes
+  - note
+  - comments
+  - remarks

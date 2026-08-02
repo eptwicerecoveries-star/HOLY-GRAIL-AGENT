@@ -1,8 +1,8 @@
 # Phase 2 Design: County-Agnostic Parsing Pipeline
 
-**Status: Phase 2A implemented and green. Phases 2B and 2C not started.** This supersedes
-ARCHITECTURE.md §2.2/§2.3 and amends the Phase 1 schema where the new surplus rule requires
-it.
+**Status: Phases 2A and 2B implemented and green. Phase 2C (OCR, county profile learning)
+not started.** This supersedes ARCHITECTURE.md §2.2/§2.3 and amends the Phase 1 schema where
+the new surplus rule requires it.
 
 Everything below is grounded in the five real PDFs now in `data/test_pdfs/`. Each design
 decision names the corpus evidence that forced it.
@@ -29,6 +29,28 @@ Three things changed once the design met the files:
 
 Measured outcome on the corpus: Marion 2023 extracts 950 rows and Marion 2024 extracts 917,
 each exactly matching the count the document declares about itself.
+
+## Implementation record for 2B
+
+Two rules were tightened once the corpus was run through them:
+
+1. **Exact matching alone picks the wrong Marion column.** The brief listed "Overbid" as a
+   surplus term, and Marion publishes a column called exactly that — so exact matching
+   would have selected the gross overbid, which on a redeemed parcel has already been
+   refunded in full. A second rule was added: when several published headers contain the
+   same surplus-ish token, none is chosen and the county is reported ambiguous. Marion's
+   three overbid columns therefore produce no answer until its config file settles it, and
+   the shipped config pins `Remaining Overbid`.
+2. **An unresolved surplus must not auto-accept.** Every other column in Marion resolves
+   cleanly, so an unconfigured county scored high enough to be routed as ready to work
+   while the one figure that matters was unknown. Ambiguity now caps routing at review,
+   the same way OCR does.
+
+Measured outcome: Calvert yields no surplus with its three published money figures intact;
+Harford yields an explicit surplus on all 49 rows; Marion yields 950 and 917 rows carrying
+a figure, of which **130** and **139** are actually claimable — the rest read `$0.00`
+because the money has already gone back. Those two counts were verified independently
+against the PDFs.
 
 ---
 

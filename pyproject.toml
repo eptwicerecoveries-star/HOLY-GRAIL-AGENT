@@ -18,6 +18,9 @@ dependencies = [
     "psycopg[binary]>=3.1,<3.2",
     "structlog>=24.1,<25.0",
     "pdfplumber>=0.11,<0.12",
+    "rapidfuzz>=3.9,<4.0",
+    "PyYAML>=6.0,<7.0",
+    "python-dateutil>=2.9,<3.0",
 ]
 
 [project.scripts]
@@ -31,6 +34,8 @@ dev = [
     "black>=24.4,<25.0",
     "mypy>=1.10,<2.0",
     "pre-commit>=3.7,<4.0",
+    "types-PyYAML",
+    "types-python-dateutil",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,0 +1,33 @@
+county_name: Marion County
+state: IN
+
+# Marion publishes five money columns, three of which contain the word "overbid":
+#
+#   Face Value       what was owed        $5,118.74
+#   Overbid          bid above face value $3,203.00
+#   Purchase Amount  face value + overbid $8,321.74
+#   Refunded Overbid already paid back    $3,203.00
+#   Remaining Overbid still held          $0.00
+#
+# Only Remaining Overbid is money the county still holds and can be claimed. The gross
+# Overbid is not: on a redeemed parcel it has already been refunded in full, as the first
+# row above shows. A row whose Remaining Overbid is $0.00 has nothing left to recover and
+# must not become a lead -- that filter belongs to lead qualification, not to parsing, so
+# the row is still extracted and stored.
+surplus_column: "Remaining Overbid"
+
+column_overrides:
+  "Unique #": unique_id
+  "Entity Name": owner_name
+  "Face Value": face_value_amount
+  "Overbid": overbid_amount
+  "Purchase Amount": purchase_amount
+  "Refunded Overbid": refunded_amount
+  "Remaining Overbid": remaining_amount
+
+derived_surplus: null
+
+notes: >-
+  Sold Date carries a timestamp with a timezone suffix, for example
+  "10/02/2023 09:40:45 AM EDT". Parcel Status distinguishes Owner Redeemed from
+  Certificate Surrendered, which is likely to matter to eligibility in a later phase.

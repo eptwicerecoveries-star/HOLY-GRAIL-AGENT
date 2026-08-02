@@ -55,6 +55,32 @@ class PageType(str, Enum):
     EMPTY = "empty"
 
 
+class SurplusSourceType(str, Enum):
+    """Where a case's surplus figure came from, or why it has none.
+
+    Persisted so a null surplus is never ambiguous: "the county published none" and
+    "several columns rivalled each other and we refused to guess" are different facts and
+    lead to different follow-up.
+    """
+
+    EXPLICIT = "explicit"
+    COUNTY_CONFIG = "county_config"
+    DERIVED = "derived"
+    AMBIGUOUS = "ambiguous"
+    ABSENT = "absent"
+
+
+class MappingMethodType(str, Enum):
+    """How a published column was resolved to a canonical field."""
+
+    COUNTY_OVERRIDE = "county_override"
+    EXACT_ALIAS = "exact_alias"
+    FUZZY_ALIAS = "fuzzy_alias"
+    VALUE_INFERENCE = "value_inference"
+    SURPLUS_EXPLICIT = "surplus_explicit"
+    UNRESOLVED = "unresolved"
+
+
 class SurplusCaseStatus(str, Enum):
     NEW = "new"
     NORMALIZED = "normalized"

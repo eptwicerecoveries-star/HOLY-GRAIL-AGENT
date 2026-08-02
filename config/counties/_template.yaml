@@ -1,0 +1,34 @@
+# Per-county overrides. Copy to config/counties/<state>/<county-slug>.yaml.
+#
+# A county needs a file here only when cold-start interpretation gets something wrong or
+# leaves it ambiguous. Many counties need no file at all. Nothing in this file is code, and
+# adding a county never requires changing the parser.
+
+county_name: Example County
+state: XX
+
+# Force a published column to a canonical field. Keys are the header exactly as published;
+# values are canonical field names. This is the highest-precedence rule there is.
+column_overrides: {}
+#   "Acct #": parcel_id
+#   "Owner at Time of Sale": owner_name
+
+# Which published column, if any, holds claimable surplus. Set this when the county is
+# reported ambiguous, or when the county's wording is not in the global vocabulary.
+#
+#   surplus_column: "Remaining Overbid"   -> that column becomes surplus_amount
+#   surplus_column: null                  -> the county publishes no surplus (the default)
+#
+# Leaving the key out entirely means "decide from the global rules", which is not the same
+# as asserting there is none.
+surplus_column: null
+
+# Set only if the county's own documentation confirms it. Deriving a surplus from other
+# columns is off by default because the difference between a bid and a debt is not the
+# surplus -- liens, fees and costs come out first.
+derived_surplus: null
+#   derived_surplus:
+#     formula: winning_bid - judgment_amount
+#     source_note: "Confirmed with county treasurer 2026-01-15"
+
+notes: ""
