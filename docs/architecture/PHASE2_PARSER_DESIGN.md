@@ -1,8 +1,10 @@
 # Phase 2 Design: County-Agnostic Parsing Pipeline
 
-**Status: Phases 2A and 2B implemented and green. Phase 2C (OCR, county profile learning)
-not started.** This supersedes ARCHITECTURE.md §2.2/§2.3 and amends the Phase 1 schema where
-the new surplus rule requires it.
+**Status: Phase 2 complete. 2A extraction, 2B interpretation and 2C OCR plus county
+profile learning are all implemented and green.**
+
+This supersedes ARCHITECTURE.md §2.2/§2.3 and amends the Phase 1 schema where the new
+surplus rule requires it.
 
 Everything below is grounded in the five real PDFs now in `data/test_pdfs/`. Each design
 decision names the corpus evidence that forced it.
@@ -45,6 +47,38 @@ Two rules were tightened once the corpus was run through them:
    cleanly, so an unconfigured county scored high enough to be routed as ready to work
    while the one figure that matters was unknown. Ambiguity now caps routing at review,
    the same way OCR does.
+
+## Implementation record for 2C
+
+Recognition on the corpus's scanned county needed three corrections that only real pixels
+revealed:
+
+1. **Recognise the whole page, then filter to the region.** Cropping to the data region
+   before recognition deprives Tesseract of the surrounding layout and cut word recovery
+   from 202 words to 37. Words are filtered to the region afterwards instead.
+2. **Gutter detection had to become fractional.** The text-layer algorithm looks for
+   columns no word ever crosses. Recognised word boxes are ragged and long owner names
+   spill sideways, so on the scanned page every position between the first and last column
+   was covered by some line, and strict emptiness found one gutter where there are four.
+   A position now counts as a gutter when a configurable share of lines leave it clear;
+   text layers keep the strict default, so nothing about 2A changed.
+3. **Rows and headers arrive fragmented.** Owner names sit on their own baseline and the
+   header is stacked three deep. A line is folded into the record above it when it leaves
+   the first column empty and fills only columns that record left empty, and leading
+   short-label lines are rejoined into one header. A spanning title is excluded by length,
+   which is what separates it from a stack of column labels.
+
+The result is imperfect and that is the point: recognition misreads digits, and the same
+parcel number came back cleanly at one setting and as "fos-03a933" at another. Every
+OCR-derived row is therefore capped at human review whatever it scores. Chasing a perfect
+read of one county would have been overfitting to it.
+
+St. Mary's is titled "Balance of Bids/Excess Funds" but publishes no per-row amount, so it
+correctly resolves to no surplus. Naming a document after surplus is not publishing one.
+
+Profiles landed as designed: append-only, identified by a hash of layout that deliberately
+excludes record counts, so Marion's 950-record and 917-record files share one profile and
+the second is recorded as another sighting rather than a new version.
 
 Measured outcome: Calvert yields no surplus with its three published money figures intact;
 Harford yields an explicit surplus on all 49 rows; Marion yields 950 and 917 rows carrying

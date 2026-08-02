@@ -145,7 +145,20 @@ def test_parse_outcome_matches_expectations(
 
     result = parsed[pdf.stem]
     assert len(result.tables) == expected["table_count"]
-    assert result.total_rows == expected["row_count"]
+    if "row_count" in expected:
+        assert result.total_rows == expected["row_count"]
+    if "min_row_count" in expected:
+        # Recognised documents assert a floor rather than an exact count: the number of
+        # rows a scanned page yields shifts slightly with the Tesseract build, and pinning
+        # it exactly would make the suite fail on a different machine rather than on a
+        # real regression.
+        assert result.total_rows >= expected["min_row_count"]
+    if "expected_strategy" in expected:
+        assert result.winning_strategy == expected["expected_strategy"]
+    if "expected_header_tokens" in expected:
+        headers = " ".join(h for table in result.tables for h in table.original_headers).casefold()
+        for token in expected["expected_header_tokens"]:
+            assert token in headers
 
 
 @pytest.mark.parametrize("pdf", WITH_EXPECTATIONS, ids=WITH_EXPECTATIONS_IDS)
@@ -356,12 +369,19 @@ def test_harford_publishes_an_explicit_surplus_column(
 def test_more_than_one_strategy_is_considered(
     pdf: Path, parsed: dict[str, ParsedDocumentResult]
 ) -> None:
-    """Selection must be a comparison, not a guess."""
+    """The winner is always the highest scorer among the strategies that could run.
+
+    A document whose data is an image legitimately offers only one candidate, since the
+    text strategies cannot read it at all. Where a text layer exists, several strategies
+    compete and the comparison is what picks between them.
+    """
     if pdf.stem not in parsed:
         return
     result = parsed[pdf.stem]
 
-    assert len(result.strategy_scores) >= 2
+    assert result.strategy_scores
+    if result.profile.extractable_pages:
+        assert len(result.strategy_scores) >= 2
     best = max(result.strategy_scores, key=lambda k: result.strategy_scores[k])
     assert result.winning_strategy == best
 

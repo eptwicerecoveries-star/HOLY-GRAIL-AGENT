@@ -22,6 +22,7 @@ from surplus_ai.parser.models import (
 from surplus_ai.parser.quality import score_tables
 from surplus_ai.parser.stitching import StitchedTable, TableStitcher
 from surplus_ai.parser.strategies.base import AbstractExtractionStrategy
+from surplus_ai.parser.strategies.ocr_table import OcrTableStrategy
 from surplus_ai.parser.strategies.pdfplumber_strategies import (
     PdfplumberLinesStrategy,
     PdfplumberTextStrategy,
@@ -40,8 +41,17 @@ DEFAULT_SELECTION_SAMPLE_PAGES = 3
 
 
 def default_strategies() -> list[AbstractExtractionStrategy]:
-    """The cascade tried against every document, in order of typical cost."""
-    return [PdfplumberLinesStrategy(), PdfplumberTextStrategy(), WordClusterStrategy()]
+    """The cascade tried against every document, in order of typical cost.
+
+    OCR comes last and claims only the pages the classifier flagged as image-only, so a
+    document with a usable text layer never pays for recognition.
+    """
+    return [
+        PdfplumberLinesStrategy(),
+        PdfplumberTextStrategy(),
+        WordClusterStrategy(),
+        OcrTableStrategy(),
+    ]
 
 
 class ParsingPipeline:
@@ -77,10 +87,11 @@ class ParsingPipeline:
                 f"{list(skipped)}. Their text layer is retained as unparsed fragments."
             )
 
-        if not profile.extractable_pages:
+        if not profile.extractable_pages and not OcrTableStrategy.is_available():
             raise OCRRequiredError(
                 f"Every data-bearing page of {pdf_path} stores its table as an image "
-                f"(pages {list(skipped)}). OCR is required to read this document."
+                f"(pages {list(skipped)}), and the OCR toolchain (tesseract, poppler) is "
+                "not installed. Install it to read this document."
             )
 
         sample_profile = self._sample_profile(profile)

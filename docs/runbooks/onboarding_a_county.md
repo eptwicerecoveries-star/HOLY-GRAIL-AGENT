@@ -11,9 +11,11 @@ surplusai parser classify path/to/county.pdf
 ```
 
 - `pdf_type: searchable` and `ocr_required: False` — proceed.
-- `ocr_required: True` — the data is a raster image. Parsing will refuse rather than return
-  the surrounding page text as if it were data. OCR support is Phase 2C; until then this
-  county cannot be onboarded.
+- `ocr_required: True` — the data is a raster image and will be read by OCR. Every row from
+  such a document is routed to human review regardless of score, so expect to check the
+  figures before working them. If `tesseract-ocr` and `poppler-utils` are not installed,
+  parsing refuses with `OCRRequiredError` rather than returning the surrounding page text
+  as if it were data.
 
 ## 2. Check what was extracted
 
@@ -100,6 +102,21 @@ headers counted as data.
 ```bash
 pytest tests/unit/parser
 ```
+
+## 6. Record the county profile
+
+```bash
+surplusai parser profile path/to/county.pdf --slug <county-slug> --state <xx> --county <county-slug>
+```
+
+This prints what the document reveals about the county — its columns, whether OCR was
+needed, which strategy read it, whether a surplus was listed — along with a version
+fingerprint. Two files in the same layout share a fingerprint even when their record counts
+differ, which is how the second is recognised as another sighting rather than a new layout.
+
+Profiles are append-only. A changed fingerprint means the county changed its layout, which
+is worth looking at: it is exactly the moment a pinned `surplus_column` can start pointing
+at a column that no longer exists.
 
 ## What must never be done
 

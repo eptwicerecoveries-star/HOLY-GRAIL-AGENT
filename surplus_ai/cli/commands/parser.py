@@ -14,6 +14,7 @@ from surplus_ai.parser.interpretation.models import SurplusSource
 from surplus_ai.parser.interpretation.pipeline import InterpretationPipeline
 from surplus_ai.parser.models import ParsedDocumentResult
 from surplus_ai.parser.pipeline import ParsingPipeline
+from surplus_ai.parser.profiles.learner import ProfileLearner
 
 logger = structlog.get_logger(__name__)
 
@@ -153,3 +154,50 @@ def _format_scores(scores: dict[str, float]) -> str:
 def _to_dict(result: ParsedDocumentResult) -> dict[str, Any]:
     parsed: dict[str, Any] = json.loads(result.model_dump_json())
     return parsed
+
+
+@app.command("profile")
+def profile(
+    pdf_path: Path = typer.Argument(..., help="PDF to learn a county profile from."),
+    slug: str = typer.Option(..., "--slug", help="County slug the profile belongs to."),
+    state: str = typer.Option("", "--state", help="Two-letter state code."),
+    county: str = typer.Option("", "--county", help="County slug for its config file."),
+) -> None:
+    """Learn what a document reveals about how its county publishes lists.
+
+    Prints the profile and its version fingerprint without writing anything. Two documents
+    in the same layout produce the same fingerprint even when their record counts differ,
+    which is how a second file is recognised as another sighting rather than a new layout.
+    """
+    county_config = load_county_config(state, county) if state and county else None
+    try:
+        parsed = ParsingPipeline().parse(pdf_path)
+        interpreted = InterpretationPipeline().interpret(parsed, county_config)
+    except ParserError as exc:
+        typer.echo(f"Could not profile {pdf_path}: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    learned = ProfileLearner().learn(
+        slug, parsed, interpreted, county_name=county or slug, state=state
+    )
+    owners = learned.owner_types
+
+    typer.echo(f"county:            {learned.county_name} ({learned.state or 'unknown'})")
+    typer.echo(f"version:           {learned.version_hash()}")
+    typer.echo(f"pdf type:          {learned.pdf_type.value}")
+    typer.echo(f"ocr required:      {learned.ocr_required}")
+    typer.echo(f"parsing strategy:  {learned.required_parsing_strategy}")
+    typer.echo(f"tables:            {len(learned.table_structures)}")
+    typer.echo(f"typical rows:      {learned.typical_row_count}")
+    typer.echo(f"surplus listed:    {learned.surplus_explicitly_listed}")
+    typer.echo(f"surplus source:    {learned.surplus_source.value}")
+    if learned.surplus_source_column:
+        typer.echo(f"surplus column:    {learned.surplus_source_column!r}")
+    typer.echo(f"columns:           {list(learned.original_column_names)}")
+    if learned.unresolved_columns:
+        typer.echo(f"unresolved:        {list(learned.unresolved_columns)}")
+    if owners.sampled:
+        typer.echo(
+            f"owner names:       {owners.sampled} sampled, "
+            f"{owners.entity_share:.0%} look like entities"
+        )

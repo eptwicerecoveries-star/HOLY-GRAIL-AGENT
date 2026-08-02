@@ -4,15 +4,16 @@ An operating system for a surplus funds recovery business: county surplus PDFs i
 qualified leads out. See `PROJECT.md` for the mission and `ARCHITECTURE.md` for the full
 design and phase roadmap.
 
-**Current status: Phase 1, Phase 2A (extraction) and Phase 2B (interpretation) complete.**
+**Current status: Phase 1 and all of Phase 2 (2A extraction, 2B interpretation,
+2C OCR and profile learning) complete.**
 
 Implemented: configuration, logging, the database schema and migrations, the `surplusai db`
-CLI, county-agnostic PDF extraction, and interpretation of a county's own columns onto a
-universal schema including the surplus rule.
+CLI, county-agnostic PDF extraction including OCR for scanned tables, interpretation of a
+county's own columns onto a universal schema including the surplus rule, and append-only
+county profile learning.
 
-Not yet implemented: OCR and county profile learning (Phase 2C), and everything from owner
-classification onward. Documents whose data is a raster image are detected and refused
-rather than partially read.
+Not yet implemented: everything from owner classification onward (Phase 3 and later), plus
+two Phase 2 follow-ups noted at the end of this file.
 
 ---
 
@@ -21,6 +22,10 @@ rather than partially read.
 - Python 3.12+
 - PostgreSQL 15+ (16 recommended)
 - `pg_dump` / `pg_restore` on `PATH` for `surplusai db backup`
+- `tesseract-ocr` and `poppler-utils` for reading scanned tables
+  (`apt-get install tesseract-ocr poppler-utils`). Without them, counties whose data is a
+  raster image fail with a clear `OCRRequiredError` instead of being partially read;
+  everything else works unchanged, and the OCR tests skip.
 
 ## Setup
 
@@ -70,6 +75,8 @@ surplusai parser inspect data/test_pdfs/Calvert_County_MD.pdf --json
 
 surplusai parser interpret data/test_pdfs/Harford_County_MD.pdf
 surplusai parser interpret data/test_pdfs/Marion_County_IN_2023.pdf --state in --county marion
+
+surplusai parser profile data/test_pdfs/Marion_County_IN_2023.pdf --slug marion --state in --county marion
 ```
 
 `db init` and `db seed` are both idempotent — running them repeatedly is safe.
@@ -87,8 +94,9 @@ Three behaviours are worth knowing before adding a county:
 - **Searchable vs scanned is decided per region, not per document.** A page can carry
   headings, disclaimers and navigation text while the table itself is a raster image.
   Asking only whether a PDF has a text layer classifies such a page as searchable and
-  yields nothing. When a data region needs OCR, parsing fails with `OCRRequiredError`
-  rather than returning the surrounding text as if it were data.
+  yields nothing. Such a region is read by OCR, or — if the OCR toolchain is not installed
+  — parsing fails with `OCRRequiredError` rather than returning the surrounding text as if
+  it were data.
 - **Header position and wrapping are detected, not assumed.** Headers may sit below a title
   and a date line, and labels wrap across physical lines. Wrapped labels are rejoined by
   word position rather than reading order, because the linearized text can pair the
@@ -97,6 +105,11 @@ Three behaviours are worth knowing before adding a county:
   retained as `unparsed_fragments`. Ragged rows keep their extra cells under overflow keys,
   and duplicate or blank column names are given positional suffixes so no column collapses
   into another.
+- **Scanned tables are read by OCR, and never trusted.** When a data region holds no text,
+  the page is rasterised and recognised, and the recovered word boxes go through the same
+  column clustering a text layer would. Every resulting row is routed to human review
+  regardless of score, because a misread digit in a money field is expensive and
+  recognition confidence does not predict that failure well.
 
 ### How interpretation works
 
@@ -160,6 +173,26 @@ export SURPLUS_AI_TEST_DATABASE_URL="postgresql+psycopg://surplus_ai:...@localho
 
 If no test database is reachable, those tests skip rather than fail.
 
+### County profiles
+
+Every parsed document yields a profile recording how that county publishes: its column
+names, whether the file was searchable or scanned, whether OCR was needed, the table
+structure, which strategy read it, whether a surplus was explicitly listed, and what its
+owner names tend to look like.
+
+Profiles are **append-only and never overwritten**. A profile's identity is a hash of its
+layout, deliberately excluding record counts and confidences — so Marion's 2023 file (950
+records) and its 2024 file (917) produce the *same* fingerprint and the second is recorded
+as another sighting of one profile rather than as a new one. A genuine layout change writes
+a new version and marks the old one superseded; nothing is ever edited or deleted, so a
+county quietly renaming a column stays visible and any past parse remains reproducible.
+
+A profile is a prior, never a decision. It reorders the strategy cascade so the extractor
+that worked last time is tried first, and it flags drift when the columns just read differ
+from the ones on record. It cannot force an outcome — the winning strategy is still
+whichever scores best structurally — so a county that changes its layout is re-read
+correctly instead of forced into last year's shape.
+
 ### The county corpus
 
 Parser tests are driven by the PDFs in `data/test_pdfs/`. Discovery happens at collection
@@ -206,3 +239,15 @@ config/counties/  per-county overrides, added without touching code
 data/test_pdfs/   county PDF corpus plus golden expectations
 docs/             architecture decisions and runbooks
 ```
+
+## Known follow-ups
+
+Two items from the Phase 2 design are deliberately not built yet:
+
+- **A persisted review queue.** Rows routed to `review` or `quarantine` are labelled and
+  returned, but there is no table backing a reviewer workflow. Nothing is lost in the
+  meantime — the routing decision travels with every row.
+- **Leave-one-out evaluation.** The corpus proves the pipeline works on the counties it has
+  seen. A harness that re-runs a county with its own profile and contributed aliases
+  excluded would measure cold-start accuracy directly, which is the sharper guard against
+  overfitting as the corpus grows.

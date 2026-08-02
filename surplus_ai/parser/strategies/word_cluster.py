@@ -117,12 +117,24 @@ def group_words_into_lines(
     return lines
 
 
-def find_column_boundaries(words: list[dict[str, Any]], min_gap_width: float) -> list[float]:
-    """Find x positions of the gutters that no word crosses.
+def find_column_boundaries(
+    words: list[dict[str, Any]],
+    min_gap_width: float,
+    min_empty_fraction: float = 1.0,
+    line_tolerance: float = DEFAULT_LINE_TOLERANCE,
+) -> list[float]:
+    """Find x positions of the gutters between columns.
 
-    Occupancy is accumulated over one-unit buckets across the full width of the content;
-    any unoccupied run at least `min_gap_width` wide, and not at the outer margins, is a
-    column boundary taken at the midpoint of the gap.
+    Occupancy is counted per line rather than across all words at once, so a gutter can be
+    recognised even when a few lines spill across it. `min_empty_fraction` is the share of
+    lines that must leave a position clear: at 1.0 the gutter must be perfectly empty,
+    which is what a text layer gives, and lowering it tolerates the ragged word boxes that
+    recognition produces.
+
+    That tolerance is not cosmetic. On the corpus's scanned county every position between
+    the first and last column is covered by some line, because owner names run long and
+    recognised boxes do not align as cleanly as typeset ones. Requiring perfect emptiness
+    finds one gutter where there are four.
     """
     if not words:
         return []
@@ -132,17 +144,25 @@ def find_column_boundaries(words: list[dict[str, Any]], min_gap_width: float) ->
         return []
 
     span = int(x_max - x_min) + 1
-    occupied = bytearray(span)
-    for word in words:
-        start = max(int(float(word["x0"]) - x_min), 0)
-        end = min(int(float(word["x1"]) - x_min) + 1, span)
-        for i in range(start, end):
-            occupied[i] = 1
+    lines = group_words_into_lines(words, line_tolerance)
+    coverage = [0] * span
+    for line in lines:
+        marked = bytearray(span)
+        for word in line:
+            start = max(int(float(word["x0"]) - x_min), 0)
+            end = min(int(float(word["x1"]) - x_min) + 1, span)
+            for i in range(start, end):
+                marked[i] = 1
+        for i in range(span):
+            if marked[i]:
+                coverage[i] += 1
+
+    allowed = len(lines) * (1.0 - min_empty_fraction)
 
     boundaries: list[float] = []
     run_start: int | None = None
     for i in range(span):
-        if not occupied[i]:
+        if coverage[i] <= allowed:
             if run_start is None:
                 run_start = i
             continue

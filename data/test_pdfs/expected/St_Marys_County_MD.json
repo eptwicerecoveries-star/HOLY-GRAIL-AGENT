@@ -1,12 +1,17 @@
 {
-  "description": "The decisive counter-example to document-level searchable detection. The page carries 1,277 characters of headings, disclaimers and navigation, while the entire surplus table is a single raster image covering 45% of the page with effectively no text inside it. Until OCR lands, parsing must refuse rather than return the surrounding chrome as data.",
+  "description": "The counter-example to document-level searchable detection. The page carries 1,277 characters of headings, disclaimers and navigation, while the entire table is a single raster image covering 45% of the page with effectively no text inside it. Read via OCR; every resulting row is routed to human review rather than auto-accepted. Titled 'Balance of Bids/Excess Funds' but publishes no per-row amount, so surplus is correctly absent.",
   "pdf_type": "hybrid",
   "ocr_required": true,
   "ocr_required_pages": [1],
   "page_count": 1,
-  "parse_raises": "OCRRequiredError",
+  "table_count": 1,
+  "requires_ocr_toolchain": true,
   "page_char_count": 1277,
   "data_region_area_ratio_min": 0.4,
   "data_region_chars_inside_max": 5,
+  "expected_strategy": "ocr_table",
+  "expected_header_tokens": ["parcel", "tax sale", "foreclosed", "owner name", "claim"],
+  "surplus_column_present": false,
+  "min_row_count": 20,
   "expected_fragments_contain": ["Treasurer of St. Mary"]
 }

@@ -21,6 +21,9 @@ dependencies = [
     "rapidfuzz>=3.9,<4.0",
     "PyYAML>=6.0,<7.0",
     "python-dateutil>=2.9,<3.0",
+    "pytesseract>=0.3.10,<0.4",
+    "pdf2image>=1.17,<2.0",
+    "Pillow>=12.2",
 ]
 
 [project.scripts]
@@ -67,6 +70,12 @@ exclude = ["tests/", "surplus_ai/database/migrations/"]
 [[tool.mypy.overrides]]
 module = "surplus_ai.database.migrations.*"
 ignore_errors = true
+
+# These ship no type information. Declared here rather than suppressed at each call site,
+# so a genuine typing error in our own code is never hidden behind a local ignore.
+[[tool.mypy.overrides]]
+module = ["pytesseract.*", "pdf2image.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
