@@ -19,3 +19,6 @@ exports/csv/*
 !data/processed/.gitkeep
 !data/cache/.gitkeep
 !exports/csv/.gitkeep
+
+# Test corpus PDFs are tracked; their generated artifacts are not
+data/test_pdfs/**/*.tmp
