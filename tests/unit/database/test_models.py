@@ -65,6 +65,7 @@ EXPECTED_TABLES = {
     "lead_scores",
     "leads",
     "owners",
+    "parsed_documents",
     "parsing_profile_versions",
     "properties",
     "raw_surplus_rows",
@@ -99,9 +100,9 @@ def _case(county: County, **overrides: object) -> SurplusCase:
     return SurplusCase(**defaults)
 
 
-def test_all_twenty_tables_are_registered() -> None:
+def test_all_tables_are_registered() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 20
+    assert len(EXPECTED_TABLES) == 21
 
 
 def test_schema_matches_models(engine, _schema) -> None:  # type: ignore[no-untyped-def]
@@ -287,16 +288,23 @@ def test_user_email_is_unique(session: Session) -> None:
         session.flush()
 
 
-def test_surplus_amount_is_required(session: Session) -> None:
+def test_surplus_amount_may_be_null(session: Session) -> None:
+    """A case with no published surplus must be storable without inventing a figure.
+
+    Counties commonly publish a sale price, a winning bid and an assessment while never
+    stating a surplus. The difference is not the surplus -- liens, fees and costs come out
+    first -- so the column is nullable and consumers must read NULL as "not a qualified
+    lead" rather than as zero.
+    """
     county = _county()
     session.add(county)
     session.flush()
-    session.add(
-        SurplusCase(county_id=county.id, case_number="C", dedupe_hash="h", surplus_amount=None)  # type: ignore[arg-type]
-    )
+    case = SurplusCase(county_id=county.id, case_number="C", dedupe_hash="h", surplus_amount=None)
+    session.add(case)
+    session.flush()
+    session.expire(case)
 
-    with pytest.raises(IntegrityError):
-        session.flush()
+    assert case.surplus_amount is None
 
 
 def test_full_object_graph_persists(session: Session) -> None:

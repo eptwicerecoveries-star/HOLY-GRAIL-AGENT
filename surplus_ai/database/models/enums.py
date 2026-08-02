@@ -37,6 +37,24 @@ class ExtractionMethod(str, Enum):
     LLM_ASSIST = "llm_assist"
 
 
+class PdfType(str, Enum):
+    """How a document's data regions are encoded, aggregated across its pages."""
+
+    SEARCHABLE = "searchable"
+    SCANNED = "scanned"
+    HYBRID = "hybrid"
+    EMPTY = "empty"
+
+
+class PageType(str, Enum):
+    """Per-page verdict. IMAGE_ONLY means the data region carries no text layer."""
+
+    TEXT = "text"
+    IMAGE_ONLY = "image_only"
+    HYBRID = "hybrid"
+    EMPTY = "empty"
+
+
 class SurplusCaseStatus(str, Enum):
     NEW = "new"
     NORMALIZED = "normalized"

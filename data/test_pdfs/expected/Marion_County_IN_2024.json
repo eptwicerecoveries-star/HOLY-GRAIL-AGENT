@@ -1,0 +1,46 @@
+{
+  "description": "Same publisher and layout as the 2023 file but a different year and page count. Kept in the corpus so profile reuse across years can be measured in a later phase.",
+  "pdf_type": "searchable",
+  "ocr_required": false,
+  "page_count": 55,
+  "table_count": 1,
+  "row_count": 917,
+  "declared_row_count": 917,
+  "declared_row_count_source": "Parcel Count: 917",
+  "expected_headers": [
+    [
+      "Unique #",
+      "Tax Year",
+      "Parcel Number",
+      "Parcel Status",
+      "Sold Date",
+      "Entity Name",
+      "Face Value",
+      "Overbid",
+      "Purchase Amount",
+      "Refunded Overbid",
+      "Remaining Overbid"
+    ]
+  ],
+  "table_spans_pages": [1, 55],
+  "surplus_column_present": false,
+  "expected_fragments_contain": ["Parcel Count: 917"],
+  "spot_check_rows": [
+    {
+      "page_number": 1,
+      "values": {
+        "Unique #": "A1",
+        "Tax Year": "2024",
+        "Parcel Number": "1000039",
+        "Parcel Status": "Certificate Surrendered",
+        "Sold Date": "09/23/2024 10:06:45 AM EDT",
+        "Entity Name": "The Tax Lien Hedge LLC",
+        "Face Value": "$4,020.79",
+        "Overbid": "$16,798.00",
+        "Purchase Amount": "$20,818.79",
+        "Refunded Overbid": "$0.00",
+        "Remaining Overbid": "$16,798.00"
+      }
+    }
+  ]
+}

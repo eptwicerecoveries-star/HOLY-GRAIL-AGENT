@@ -1,0 +1,46 @@
+{
+  "description": "Searchable, 49 pages, header repeated on every page. Row count is asserted against the document's own declared 'Parcel Count: 950'. Three columns contain the token 'overbid', which is why surplus resolution may not fuzzy match.",
+  "pdf_type": "searchable",
+  "ocr_required": false,
+  "page_count": 49,
+  "table_count": 1,
+  "row_count": 950,
+  "declared_row_count": 950,
+  "declared_row_count_source": "Parcel Count: 950",
+  "expected_headers": [
+    [
+      "Unique #",
+      "Tax Year",
+      "Parcel Number",
+      "Parcel Status",
+      "Sold Date",
+      "Entity Name",
+      "Face Value",
+      "Overbid",
+      "Purchase Amount",
+      "Refunded Overbid",
+      "Remaining Overbid"
+    ]
+  ],
+  "table_spans_pages": [1, 49],
+  "surplus_column_present": false,
+  "expected_fragments_contain": ["Parcel Count: 950"],
+  "spot_check_rows": [
+    {
+      "page_number": 1,
+      "values": {
+        "Unique #": "A3",
+        "Tax Year": "2023",
+        "Parcel Number": "1000363",
+        "Parcel Status": "Owner Redeemed",
+        "Sold Date": "10/02/2023 09:40:45 AM EDT",
+        "Entity Name": "Macallan Properties, LLC",
+        "Face Value": "$5,118.74",
+        "Overbid": "$3,203.00",
+        "Purchase Amount": "$8,321.74",
+        "Refunded Overbid": "$3,203.00",
+        "Remaining Overbid": "$0.00"
+      }
+    }
+  ]
+}

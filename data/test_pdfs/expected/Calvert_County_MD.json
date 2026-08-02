@@ -1,0 +1,27 @@
+{
+  "description": "Searchable, 2 pages. Header is row 2 (rows 0-1 are a title and sale date). Page 2 continues with no header and must inherit. Publishes no surplus column at all.",
+  "pdf_type": "searchable",
+  "ocr_required": false,
+  "page_count": 2,
+  "table_count": 1,
+  "row_count": 96,
+  "expected_headers": [
+    ["PARCEL", "OWNER", "LOCATION", "ASSESSMENT", "SALE AMOUNT", "BID AMOUNT"]
+  ],
+  "table_page_numbers": [[1, 2]],
+  "surplus_column_present": false,
+  "expected_fragments_contain": ["2026 CALVERT COUNTY TAX SALE RESULTS"],
+  "spot_check_rows": [
+    {
+      "page_number": 1,
+      "values": {
+        "PARCEL": "01-008153",
+        "OWNER": "GANTT THOMAS",
+        "LOCATION": "8.5 AC",
+        "ASSESSMENT": "133,000",
+        "SALE AMOUNT": "3,743.93",
+        "BID AMOUNT": "15,000.00"
+      }
+    }
+  ]
+}

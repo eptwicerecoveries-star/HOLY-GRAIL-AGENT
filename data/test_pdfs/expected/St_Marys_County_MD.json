@@ -1,0 +1,12 @@
+{
+  "description": "The decisive counter-example to document-level searchable detection. The page carries 1,277 characters of headings, disclaimers and navigation, while the entire surplus table is a single raster image covering 45% of the page with effectively no text inside it. Until OCR lands, parsing must refuse rather than return the surrounding chrome as data.",
+  "pdf_type": "hybrid",
+  "ocr_required": true,
+  "ocr_required_pages": [1],
+  "page_count": 1,
+  "parse_raises": "OCRRequiredError",
+  "page_char_count": 1277,
+  "data_region_area_ratio_min": 0.4,
+  "data_region_chars_inside_max": 5,
+  "expected_fragments_contain": ["Treasurer of St. Mary"]
+}

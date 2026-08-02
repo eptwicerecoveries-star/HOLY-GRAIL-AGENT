@@ -1,10 +1,34 @@
 # Phase 2 Design: County-Agnostic Parsing Pipeline
 
-Design only — no implementation. This supersedes ARCHITECTURE.md §2.2/§2.3 and amends the
-Phase 1 schema where the new surplus rule requires it.
+**Status: Phase 2A implemented and green. Phases 2B and 2C not started.** This supersedes
+ARCHITECTURE.md §2.2/§2.3 and amends the Phase 1 schema where the new surplus rule requires
+it.
 
 Everything below is grounded in the five real PDFs now in `data/test_pdfs/`. Each design
 decision names the corpus evidence that forced it.
+
+## Implementation record for 2A
+
+Three things changed once the design met the files:
+
+1. **Region emptiness is a density test, not a zero test.** The design assumed a scanned
+   data region contains no characters. St. Mary's contains exactly one stray glyph inside
+   its table image, which defeated an `== 0` check and classified the document as
+   searchable. The test is now characters per 1000 square units, where a genuine text page
+   measures about 9.1 and that region measures 0.002.
+2. **Continuation is decided by column count alone.** The design had a continuation page
+   matching on headers. In practice a headerless continuation page begins with a data row,
+   and header detection nominates that row because data rows still score moderately well as
+   labels — 0.806 against 1.000 for a real header. Requiring a header match split Calvert
+   into two tables and promoted a real record into a header, destroying it. Matching column
+   count is the stable signal.
+3. **Strategies are compared on a sample, then the winner runs alone.** Running every
+   strategy across a 55-page document tripled the work for no additional information, since
+   a county prints one layout on every page. Selection now uses the first few readable
+   pages, which halved corpus parse time with identical results.
+
+Measured outcome on the corpus: Marion 2023 extracts 950 rows and Marion 2024 extracts 917,
+each exactly matching the count the document declares about itself.
 
 ---
 
@@ -14,7 +38,7 @@ decision names the corpus evidence that forced it.
 |---|---|---|---|---|---|
 | Calvert County MD | 2 | searchable | row 2 (rows 0–1 are title/date), `SALE\nAMOUNT` wrapped | ASSESSMENT, SALE AMOUNT, BID AMOUNT | **No** |
 | Harford County MD | 1 | searchable | row 0 | SURPLUS | **Yes** |
-| Marion County IN 2023 | 49 | searchable | row 0, repeats every page | Face Value Amount, Overbid, Purchase Amount, Refunded Overbid, Remaining Overbid | **Ambiguous — 4 overbid columns** |
+| Marion County IN 2023 | 49 | searchable | row 0, repeats every page | Face Value, Overbid, Purchase Amount, Refunded Overbid, Remaining Overbid | **Ambiguous — 3 columns say "overbid"** |
 | Marion County IN 2024 | 55 | searchable | same | same | same |
 | St. Mary's County MD | 1 | **1,277 chars of chrome, 0 chars in the data region** | none extractable | unknown until OCR | unknown |
 
@@ -31,10 +55,16 @@ where the tabular data actually is.
 sale date. Header position must be detected, never assumed.
 
 **(c) Headers wrap across physical lines.** Calvert has `SALE\nAMOUNT`; Marion has
-`Purchase\nAmount`, `Refunded\nOverbid`, `Remaining\nOverbid`. Naive line-joining
-mis-assigns continuation words to neighbouring columns — pdfplumber already produces
-`Face Value` where the published header is `Face Value Amount`. Header reconstruction must
-use x-coordinate alignment, not text order.
+`Purchase\nAmount`, `Refunded\nOverbid`, `Remaining\nOverbid`. Reading the linearized text
+is actively misleading here: line 1 ends `... Face Value | Overbid | Purchase | Refunded |
+Remaining` and line 2 reads `Amount | Overbid | Overbid`, which invites the wrong pairing.
+The word boxes settle it — each line-2 word sits at the exact x-center of its line-1
+partner (`Amount` 646.5 under `Purchase` 646.5; `Overbid` 716.3 under `Refunded` 716.3;
+`Overbid` 786.1 under `Remaining` 786.1). The published headers are therefore `Face Value`,
+`Overbid`, `Purchase Amount`, `Refunded Overbid`, `Remaining Overbid`, and the arithmetic
+confirms it: Face Value $5,118.74 + Overbid $3,203.00 = Purchase Amount $8,321.74. Header
+reconstruction must use **x-coordinate alignment, never text order**, and the reconstructed
+header is verified independently rather than taken on trust from any one library.
 
 **(d) Multi-page continuation behaves in opposite ways within one corpus.** Calvert page 2
 has **no header** and must inherit page 1's. Marion repeats its header on **all 49 pages**
@@ -47,8 +77,9 @@ assertion, and the 2024 file declares 917.
 SALE AMOUNT and BID AMOUNT — bid ($15,000.00) exceeds sale amount ($3,743.93), so a surplus
 plainly exists arithmetically, but **the county does not publish it**. Per requirement 7 the
 system must record `surplus_amount = NULL` and preserve the three published figures in their
-own fields. Marion is the opposite trap: four columns contain the token "overbid", and a
-substring or fuzzy match would fire on all four.
+own fields. Marion is the opposite trap: three columns contain the token "overbid"
+(`Overbid`, `Refunded Overbid`, `Remaining Overbid`) alongside two further money columns
+(`Face Value`, `Purchase Amount`), and a substring or fuzzy match would fire on all three.
 
 ---
 
@@ -368,10 +399,10 @@ already supports:
 - Harford → `surplus_amount` populated, `surplus_is_explicit = true`, sourced from `SURPLUS`
 - St. Mary's → `ocr_required = true` **despite** 1,277 chars of page text, and every
   resulting row routed to `review` rather than auto-accepted
-- Marion → four overbid columns preserved as four distinct fields; `surplus_amount` sourced
+- Marion → all five money columns preserved as distinct fields; `surplus_amount` sourced
   from `Remaining Overbid`; a row with `Remaining Overbid = $0.00` is not a lead
 - Regression guard: with Marion's county config removed, `surplus_source` must fall back to
-  `ambiguous` and never silently pick one of the four columns
+  `ambiguous` and never silently pick one of the three overbid columns
 
 **Leave-one-county-out evaluation.** `surplusai parser evaluate --holdout <county>` re-runs
 the pipeline with that county's profile *and* its contributed aliases excluded, measuring

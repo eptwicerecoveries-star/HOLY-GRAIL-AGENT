@@ -41,7 +41,10 @@ class SurplusCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     sale_date: Mapped[date | None] = mapped_column(Date, index=True)
     judgment_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     sale_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
-    surplus_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # Nullable by design: many counties publish sale/bid/assessment figures but never state
+    # a surplus. Inferring one arithmetically would manufacture a lead, so absence is
+    # recorded as NULL and consumers must treat NULL as "not a qualified lead", never zero.
+    surplus_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     distribution_deadline: Mapped[date | None] = mapped_column(Date)
     status: Mapped[SurplusCaseStatus] = mapped_column(
         pg_enum(SurplusCaseStatus, "surplus_case_status"),

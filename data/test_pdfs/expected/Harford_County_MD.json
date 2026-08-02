@@ -1,0 +1,34 @@
+{
+  "description": "Searchable, single page, header at row 0. The only file in the corpus with an explicitly named SURPLUS column.",
+  "pdf_type": "searchable",
+  "ocr_required": false,
+  "page_count": 1,
+  "table_count": 1,
+  "row_count": 49,
+  "expected_headers": [
+    [
+      "TAX SALE YEAR",
+      "DATE OF FORECLOSURE",
+      "PROPERTY OWNER AT TIME OF SALE",
+      "ACCT #",
+      "LAST KNOWN ADDRESS",
+      "SURPLUS"
+    ]
+  ],
+  "table_page_numbers": [[1]],
+  "surplus_column_present": true,
+  "expected_fragments_contain": ["Updated 6/1/26"],
+  "spot_check_rows": [
+    {
+      "page_number": 1,
+      "values": {
+        "TAX SALE YEAR": "2011",
+        "DATE OF FORECLOSURE": "1/8/2014",
+        "PROPERTY OWNER AT TIME OF SALE": "ESTATE OF JERIMIAH GILBERT",
+        "ACCT #": "01-038036",
+        "LAST KNOWN ADDRESS": "608 DEMBYTOWN ROAD, JOPPA, MD 21085",
+        "SURPLUS": "$491.33"
+      }
+    }
+  ]
+}
