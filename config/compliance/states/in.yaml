@@ -1,0 +1,39 @@
+# Indiana surplus-funds compliance rules.
+#
+# NOT YET RESEARCHED. Every statutory value below is null and `verified` is false, so the
+# engine reports every Indiana case as ineligible with the reason "rules unverified".
+# That is intentional: no number here was guessed, and none should be added without
+# reading the statute.
+#
+# Marion County is in the corpus, so this state matters — but a plausible-looking figure would be worse than an
+# empty one, because it would silently clear cases against a rule nobody checked.
+#
+# To bring Indiana online: fill in the values from the statute, cite it, set verified: true.
+
+state_code: IN
+state_name: Indiana
+
+verified: false
+verified_by: ""
+verified_on: null
+statute_citations: []
+source_urls: []
+
+waiting_period_days: null
+claim_deadline_days: null
+escheatment_period_days: null
+
+fee_cap_basis: percentage_of_recovery
+max_contingency_fee_pct: null
+max_flat_fee_amount: null
+
+requires_written_contract: null
+requires_notarized_contract: null
+requires_locator_license: null
+prohibits_assignment_of_claim: null
+cooling_off_days: null
+
+required_disclosures: []
+
+notes: >-
+  Awaiting statutory research. Until then every case in this state is held back by design.

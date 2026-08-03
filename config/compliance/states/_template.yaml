@@ -1,0 +1,64 @@
+# Template for a state's surplus-funds compliance rules.
+#
+# Copy to <state-code>.yaml (lower case, e.g. md.yaml) and fill in from the statute.
+#
+# READ THIS FIRST
+#
+# Every value here is a legal parameter. Getting one wrong is not a bug that shows up in a
+# test — it can mean contacting a former owner during a statutory blackout, or agreeing a
+# fee above a state's cap. Both void contracts, and in several states charging over the cap
+# is a criminal offence. Nothing in this file may be guessed, copied from a neighbouring
+# state, or inferred from what "most states" do. Surplus recovery is regulated state by
+# state and the variation is the whole point.
+#
+# The system fails closed. A state with no file, an unverified file, or a file missing a
+# required value produces "not eligible" with the reason named — never "eligible" with a
+# default quietly filled in. Leaving a value null is therefore safe; guessing at it is not.
+#
+# Set `verified: true` only when a person has checked every value below against the cited
+# statute. The loader rejects a file marked verified that still has gaps.
+
+state_code: XX
+state_name: Example State
+
+# --- Verification -----------------------------------------------------------------------
+# Until this is true, no case in this state can be cleared.
+verified: false
+verified_by: ""          # who checked it
+verified_on: null        # YYYY-MM-DD
+statute_citations: []    # e.g. ["Md. Tax-Prop. § 14-818"] — required for verification
+source_urls: []
+
+# --- Timing -----------------------------------------------------------------------------
+# Days after the sale before a former owner may lawfully be contacted. 0 is a real answer
+# meaning no wait; null means unknown and holds every case in the state.
+waiting_period_days: null
+
+# Days after the sale by which a claim must be filed, and by which unclaimed funds pass to
+# the state. Leave null if the state sets none.
+claim_deadline_days: null
+escheatment_period_days: null
+
+# --- Fees -------------------------------------------------------------------------------
+# fee_cap_basis is one of:
+#   percentage_of_recovery  cap is a percentage — set max_contingency_fee_pct
+#   flat_amount             cap is a fixed sum  — set max_flat_fee_amount
+#   none                    the state caps nothing. A positive finding, not "unknown".
+fee_cap_basis: percentage_of_recovery
+max_contingency_fee_pct: null
+max_flat_fee_amount: null
+
+# --- Contract form ----------------------------------------------------------------------
+requires_written_contract: null
+requires_notarized_contract: null
+requires_locator_license: null
+prohibits_assignment_of_claim: null
+cooling_off_days: null
+
+# --- Disclosures ------------------------------------------------------------------------
+# Statutes often prescribe disclosure wording exactly. Put the required text here verbatim
+# rather than paraphrasing it; the system reproduces whatever this list contains and does
+# not supply language of its own.
+required_disclosures: []
+
+notes: ""

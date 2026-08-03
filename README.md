@@ -4,15 +4,19 @@ An operating system for a surplus funds recovery business: county surplus PDFs i
 qualified leads out. See `PROJECT.md` for the mission and `ARCHITECTURE.md` for the full
 design and phase roadmap.
 
-**Current status: Phases 1, 2 and 3 complete.**
+**Current status: Phases 1 through 4 complete.**
 
 Implemented: configuration, logging, the database schema and migrations, the `surplusai db`
 CLI, county-agnostic PDF extraction including OCR for scanned tables, interpretation of a
 county's own columns onto a universal schema including the surplus rule, append-only county
-profile learning, persistence with a reviewer work queue, leave-one-out evaluation, and
-owner classification.
+profile learning, persistence with a reviewer work queue, leave-one-out evaluation, owner
+classification, and the compliance engine.
 
-Not yet implemented: compliance rules (Phase 4) and everything after.
+Not yet implemented: lead creation (Phase 5) and everything after.
+
+> **The compliance engine ships with no statutes, so it currently clears nothing.** The engine
+> is complete; the state files are deliberately empty. See
+> [Compliance](#compliance-and-why-no-state-works-yet) before expecting a case to pass.
 
 The whole pipeline in one number: **2,012 extracted rows across the corpus become 141
 actual leads** — rows where the county holds money *and* the owner is worth contacting.
@@ -88,6 +92,10 @@ surplusai parser evaluate --state in --holdout marion --holdout-pdf data/test_pd
 
 surplusai classify name "ESTATE OF JERIMIAH GILBERT"
 surplusai classify document data/test_pdfs/Harford_County_MD.pdf
+
+surplusai compliance states                 # which states have rules, and which can be relied on
+surplusai compliance validate MD            # what MD still needs before it can be used
+surplusai compliance check MD --sale-date 2024-03-01 --amount 12500.00
 ```
 
 `db init` and `db seed` are both idempotent — running them repeatedly is safe.
@@ -238,6 +246,7 @@ surplus_ai/
     cli/          Typer CLI (surplusai)
     database/     ORM models, engine/session, Alembic migrations, seed data
     classifier/   owner type rules, entity vocabulary, name splitting
+    compliance/   state rules, waiting periods, fee caps, disclosures, eligibility engine
     parser/       document classification, extraction strategies, quality scoring,
                   header reconstruction, multi-page stitching, persistence, evaluation
       interpretation/  canonical schema, alias registry, type inference,
@@ -250,6 +259,7 @@ tests/
 config/parsing/        field aliases, surplus vocabulary, confidence thresholds
 config/counties/       per-county overrides, added without touching code
 config/classification/ entity vocabulary and which owner kinds to pursue
+config/compliance/     one file per state; statutory values, unverified until checked
 data/test_pdfs/   county PDF corpus plus golden expectations
 docs/             architecture decisions and runbooks
 ```
@@ -281,6 +291,60 @@ The two counties in the corpus have opposite shapes, which is why both are teste
 is a tax sale of occupied property and is mostly individuals, while Marion is a lien
 auction and is 82% companies.
 
+### Compliance, and why no state works yet
+
+Reading a county's PDF tells you what the county published. It does not tell you whether the
+case may lawfully be worked. That is a question about state law, and it is answered by
+`surplus_ai/compliance/` against one YAML file per state in `config/compliance/states/`.
+
+**The engine is complete. The statutes are not filled in, so nothing is currently eligible.**
+
+```
+$ surplusai compliance states
+2 state file(s); 0 usable
+
+  IN  BLOCKED  Indiana
+       missing: ['verified', 'waiting_period_days', 'max_contingency_fee_pct', 'statute_citations']
+  MD  BLOCKED  Maryland
+       missing: ['verified', 'waiting_period_days', 'max_contingency_fee_pct', 'statute_citations']
+
+  No state can currently clear a case.
+```
+
+That is a deliberate position rather than unfinished work. Maryland's waiting period is a fact
+about Maryland law — it cannot be derived from the corpus, from Indiana, from how surplus
+recovery usually works, or from a language model's recollection of a statute. A plausible
+number in `waiting_period_days` is worse than an empty one, because an empty one blocks the
+case and a plausible one clears it against a rule nobody checked.
+
+`docs/runbooks/onboarding_a_state_compliance_profile.md` is the path from here to a working
+state: copy the template, read the statute, record the citations, set `verified: true`.
+
+**Everything fails closed.** `is_eligible` defaults to false and is granted only when verified
+rules positively permit contact. Each refusal carries a coded reason — `no_state_rules`,
+`rules_unverified`, `rules_incomplete`, `no_sale_date`, `waiting_period`,
+`claim_deadline_passed`, `escheated`, `licence_required` — and all applicable reasons are
+reported at once, so a reviewer is not sent round the loop three times.
+
+The asymmetry is the whole design. Wrongly blocking a case costs one lead and shows up in the
+blocking counts; wrongly clearing one can mean contacting a former owner during a statutory
+blackout or agreeing a fee above a cap, which voids contracts and in several states is a
+criminal matter. So "unknown" never means "permitted":
+
+- `waiting_period_days: null` means *we do not know when contact becomes lawful*, not
+  *contact immediately*. `0` is how a state with no wait is recorded.
+- `fee_cap_basis: none` means *this state caps nothing, and we confirmed it* — a positive
+  finding, never a way to record "couldn't find one".
+- A missing cap makes the system refuse to quote a maximum fee rather than return a large one.
+- `verified: true` with any gap in it is rejected at load time, and a verified file with no
+  statute citation is treated as incomplete.
+
+Required disclosures are reproduced verbatim from the config. Statutes prescribe wording
+exactly, and a paraphrase of prescribed wording is not the prescribed wording — the system
+contributes no language of its own.
+
+Full reasoning: `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`.
+
 ### Storing results and the review queue
 
 `parser ingest` writes the document, every row verbatim, how each column was interpreted,
@@ -306,6 +370,11 @@ things:
 
 ## Known follow-ups
 
+- **No state's statutes are recorded.** The compliance engine is finished but every state file
+  is empty and unverified, so no case is eligible today. Bringing a state online requires
+  reading its statutes and following
+  `docs/runbooks/onboarding_a_state_compliance_profile.md`. This is the one follow-up that
+  blocks the business rather than the code.
 - **A trained owner classifier.** Classification is rule-based and config-driven, which is
   what the corpus supports. ARCHITECTURE.md places a trained model in Phase 12, once enough
   reviewed names have accumulated to train on; the interface already carries a `method`

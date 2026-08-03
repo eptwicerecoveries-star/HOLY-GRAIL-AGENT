@@ -1038,11 +1038,17 @@ touching any caller.
 Each phase is complete (tests + logging + docs + error handling, per CLAUDE.md) before the
 next starts. No phase modifies modules outside its own boundary.
 
-> **Implementation status.** Phases 0–3 are complete. Phase 2 grew into three sub-phases
+> **Implementation status.** Phases 0–4 are complete. Phase 2 grew into three sub-phases
 > (2A extraction, 2B interpretation, 2C OCR and county profile learning) once real county
 > PDFs showed the work was larger than one phase; see
 > `docs/architecture/PHASE2_PARSER_DESIGN.md` and `PHASE3_CLASSIFIER_DESIGN.md` for what the
-> corpus changed about the design. Phase 4 (compliance) is next.
+> corpus changed about the design.
+>
+> Phase 4's engine is complete but ships with **no statutory values recorded**, so no state
+> can currently clear a case. The statutes were not supplied and are not the kind of fact to
+> infer; `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md` explains the reasoning and
+> `docs/runbooks/onboarding_a_state_compliance_profile.md` is the path to bringing a state
+> online. Phase 5 (lead creation) is next.
 
 **Phase 0 — Foundations**
 Repo scaffold, `pyproject.toml`, `utils/config.py`, `utils/logging_config.py`, base
