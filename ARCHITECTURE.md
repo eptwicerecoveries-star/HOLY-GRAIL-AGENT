@@ -1048,7 +1048,15 @@ next starts. No phase modifies modules outside its own boundary.
 > can currently clear a case. The statutes were not supplied and are not the kind of fact to
 > infer; `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md` explains the reasoning and
 > `docs/runbooks/onboarding_a_state_compliance_profile.md` is the path to bringing a state
-> online. Phase 5 (lead creation) is next.
+> online.
+>
+> Phase 5 (lead creation) is also complete: counties, cases, properties, owners, compliance
+> evaluations and leads are all written, with the lead gate documented in
+> `docs/architecture/PHASE5_LEAD_DESIGN.md`. It produces zero leads today for the reason
+> above, and `surplusai leads promote` converts the backlog once a state is brought online.
+> Research and enrichment is next; note the roadmap below numbers the phases from 0, so what
+> has been delivered as Phases 1-5 corresponds to Phases 0-3 plus lead creation, which the
+> original roadmap folded into its Phase 4 rather than naming separately.
 
 **Phase 0 — Foundations**
 Repo scaffold, `pyproject.toml`, `utils/config.py`, `utils/logging_config.py`, base

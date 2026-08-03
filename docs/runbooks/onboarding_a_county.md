@@ -149,6 +149,35 @@ the file's contents, not its name.
 Work the queue with `parser review resolve <id> --by <name>`. Resolving closes the work item
 and never alters the extracted row.
 
+## 9. Build the cases
+
+```bash
+surplusai leads build path/to/county.pdf --state <xx> --county <county-slug>
+```
+
+This does everything step 8 does and then builds the business records: the county itself,
+a case per row, a property where one was described, an owner per published name, a
+compliance verdict per case, and a lead for each case that clears every gate.
+
+Read the funnel it prints. `cases created` on a second run should be zero — a republished
+list is not new work. A large `owner_not_pursuable` count is normal for a lien auction and
+tells you what the county's list actually contains.
+
+**Expect zero leads.** Until the county's state has its statutes recorded, every case is
+held at the compliance gate and reported as `compliance_blocked`. That is the system working:
+follow `onboarding_a_state_compliance_profile.md`, then run
+
+```bash
+surplusai leads promote --state <xx> --county <county-slug>
+```
+
+which converts the held backlog into leads without re-parsing anything.
+
+If the county needs registration details recorded — where its list comes from, how often it
+publishes — add `fips_code`, `source_type`, `source_url` and `publishing_frequency` to its
+config file. Prefer an official API or bulk download over anything scraped, and say which it
+was: `source_type` is how the team knows.
+
 ## What must never be done
 
 - **Do not compute a surplus** from a bid minus a debt. Liens, fees and costs are paid
@@ -167,3 +196,6 @@ and never alters the extracted row.
 - **Do not add short entity markers that collide with surnames.** Markers match whole words,
   but a marker like `an` or `de` would still fire on real names. When in doubt, prefer a
   longer, unambiguous form.
+- **Do not treat zero leads as a parsing failure.** Check the rejection counts first. A
+  `compliance_blocked` count equal to the claimable cases means the state's statutes are not
+  recorded, which is a state onboarding task, not a county one.

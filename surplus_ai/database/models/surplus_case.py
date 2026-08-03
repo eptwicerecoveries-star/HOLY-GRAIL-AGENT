@@ -43,7 +43,11 @@ class SurplusCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     raw_row_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("raw_surplus_rows.id", ondelete="SET NULL"), index=True
     )
-    case_number: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    # Nullable because most counties publish no case number at all -- they publish a parcel
+    # or account number, or nothing but a name and an amount. Synthesising an identifier to
+    # satisfy a NOT NULL would put a number in a field a reader would reasonably take for
+    # the county's own. Identity lives in dedupe_hash, which is built for the purpose.
+    case_number: Mapped[str | None] = mapped_column(String(200), index=True)
     parcel_id: Mapped[str | None] = mapped_column(String(200), index=True)
     property_address_raw: Mapped[str | None] = mapped_column(Text)
     property_address_normalized: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

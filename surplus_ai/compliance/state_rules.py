@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 from enum import Enum
 
@@ -85,6 +86,36 @@ class StateComplianceRules(BaseModel):
         if self.fee_cap_basis is FeeCapBasis.PERCENTAGE_OF_RECOVERY:
             return self.max_contingency_fee_pct is not None
         return self.max_flat_fee_amount is not None
+
+    def version_hash(self) -> str:
+        """A fingerprint of the statutory values, for recording which rules judged a case.
+
+        Only the values that change a verdict are included. The name of whoever verified
+        the file, the date they did it and any notes are excluded: re-checking a file and
+        finding it unchanged should not make every past evaluation look as though it was
+        decided under different rules.
+        """
+        payload = "|".join(
+            str(part)
+            for part in (
+                self.state_code,
+                self.verified,
+                self.waiting_period_days,
+                self.fee_cap_basis.value,
+                self.max_contingency_fee_pct,
+                self.max_flat_fee_amount,
+                self.claim_deadline_days,
+                self.escheatment_period_days,
+                self.requires_written_contract,
+                self.requires_notarized_contract,
+                self.requires_locator_license,
+                self.prohibits_assignment_of_claim,
+                self.cooling_off_days,
+                "~".join(self.required_disclosures),
+                "~".join(self.statute_citations),
+            )
+        )
+        return f"{self.state_code.lower()}-{hashlib.sha256(payload.encode()).hexdigest()[:16]}"
 
     def missing_fields(self) -> tuple[str, ...]:
         """Which required facts are still unknown, for reporting to whoever fills them in."""

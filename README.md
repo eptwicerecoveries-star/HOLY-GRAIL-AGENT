@@ -4,15 +4,15 @@ An operating system for a surplus funds recovery business: county surplus PDFs i
 qualified leads out. See `PROJECT.md` for the mission and `ARCHITECTURE.md` for the full
 design and phase roadmap.
 
-**Current status: Phases 1 through 4 complete.**
+**Current status: Phases 1 through 5 complete.**
 
 Implemented: configuration, logging, the database schema and migrations, the `surplusai db`
 CLI, county-agnostic PDF extraction including OCR for scanned tables, interpretation of a
 county's own columns onto a universal schema including the surplus rule, append-only county
 profile learning, persistence with a reviewer work queue, leave-one-out evaluation, owner
-classification, and the compliance engine.
+classification, the compliance engine, and lead creation.
 
-Not yet implemented: lead creation (Phase 5) and everything after.
+Not yet implemented: research and enrichment (Phase 6) and everything after.
 
 > **The compliance engine ships with no statutes, so it currently clears nothing.** The engine
 > is complete; the state files are deliberately empty. See
@@ -96,6 +96,10 @@ surplusai classify document data/test_pdfs/Harford_County_MD.pdf
 surplusai compliance states                 # which states have rules, and which can be relied on
 surplusai compliance validate MD            # what MD still needs before it can be used
 surplusai compliance check MD --sale-date 2024-03-01 --amount 12500.00
+
+surplusai leads build data/test_pdfs/Harford_County_MD.pdf --state md --county harford
+surplusai leads status --state md --county harford
+surplusai leads promote --state md --county harford   # after a state's statutes are recorded
 ```
 
 `db init` and `db seed` are both idempotent — running them repeatedly is safe.
@@ -247,6 +251,7 @@ surplus_ai/
     database/     ORM models, engine/session, Alembic migrations, seed data
     classifier/   owner type rules, entity vocabulary, name splitting
     compliance/   state rules, waiting periods, fee caps, disclosures, eligibility engine
+    leads/        county registry, case identity, case/owner builders, the lead gate
     parser/       document classification, extraction strategies, quality scoring,
                   header reconstruction, multi-page stitching, persistence, evaluation
       interpretation/  canonical schema, alias registry, type inference,
@@ -355,6 +360,48 @@ republish the same list under new filenames.
 A queued row is a work item, not a quarantined record — it is stored either way, and
 resolving it never alters the extracted data. Each entry says plainly why it is there.
 
+### From rows to leads
+
+`leads build` runs the whole chain on one document: parse, interpret, store, then build
+cases, owners, compliance verdicts and leads.
+
+```
+$ surplusai leads build data/test_pdfs/Harford_County_MD.pdf --state md --county harford
+cases seen:     49
+cases created:  49
+owners written: 49
+leads created:  0
+not leads:
+  compliance_blocked       35
+  owner_not_pursuable      14
+```
+
+**Cases and owners are records of fact; a lead is a decision.** A case is written for every
+row a county published, whatever the row says — a row that produced no record is a row
+nobody can account for later, and "we never saw it" has to be distinguishable from "we saw
+it and it was empty". A lead says someone should be called, and needs all four of:
+
+1. a surplus figure that exists **and** is above zero,
+2. an owner of a kind the business pursues,
+3. a row the parser auto-accepted — nothing unreviewed reaches a call list,
+4. a state whose rules positively permit contact.
+
+Condition 4 blocks everything today, which is why the corpus produces **zero leads**. That
+is the fail-closed compliance design working, not a gap here. `leads promote` is the other
+half of the bargain: when a state is brought online it re-checks stored cases and creates
+the leads that now pass, without re-parsing anything. Failing closed costs time, not the
+backlog.
+
+Two rejection codes are kept apart on purpose. `no_surplus` means the county said nothing;
+`surplus_not_claimable` means it said zero — a real figure, since a fully refunded overbid
+genuinely reads $0.00. Nothing in this layer fills a missing surplus in from a winning bid
+or an assessment.
+
+Cases are identified by what the county published — a parcel or case number, narrowed by
+sale date, falling back to the verbatim row when a county publishes no identifier. Running
+the same document twice creates no second case. Full reasoning:
+`docs/architecture/PHASE5_LEAD_DESIGN.md`.
+
 ### Measuring generalisation
 
 The corpus proves the pipeline reads the counties it has seen, which is not the same as
@@ -379,9 +426,13 @@ things:
   what the corpus supports. ARCHITECTURE.md places a trained model in Phase 12, once enough
   reviewed names have accumulated to train on; the interface already carries a `method`
   field so a model can be added alongside the rules rather than replacing them.
-- **Owner rows are not yet written.** Classification runs over parsed documents and via the
-  CLI, but nothing persists to the `owners` table. That belongs with lead creation, which
-  is Phase 5.
+- **Leads carry no contact details.** A lead points at a case and an owner, and nothing
+  else. Addresses, phones and skip-trace results are Phase 6, which needs external
+  providers; `leads.score` stays null until Phase 7 for the same reason — ranking an empty
+  set would tell nobody anything.
+- **Ingestion jobs are not recorded.** Cases can be built without one, so `leads build`
+  writes no `ingestion_jobs` row. Wiring that belongs with the orchestrator phase, which is
+  what will actually schedule the runs.
 - **Suite runtime.** The corpus tests parse a 49-page and a 55-page county repeatedly, so a
   full `pytest` run takes several minutes. Module-scoped fixtures already avoid the worst of
   it; caching parsed results across modules would cut it further.

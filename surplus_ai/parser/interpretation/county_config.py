@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ import structlog
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from surplus_ai.database.models.enums import CountySourceType, PublishingFrequency
 from surplus_ai.parser.exceptions import ParserError
 from surplus_ai.parser.interpretation.canonical import CanonicalField
 
@@ -44,6 +46,15 @@ class CountyConfig(BaseModel):
     surplus_column_declared: bool = False
     derived_surplus: DerivedSurplus | None = None
     notes: str = ""
+
+    # Registration details. These say nothing about how a document is read; they describe
+    # where the county's list comes from, and are recorded on the county when cases are
+    # first written for it. They live here because this is the county's file -- a second
+    # file describing the same county would be one more thing to keep in step.
+    fips_code: str | None = None
+    source_type: CountySourceType = CountySourceType.MANUAL_UPLOAD
+    source_url: str | None = None
+    publishing_frequency: PublishingFrequency = PublishingFrequency.IRREGULAR
 
     def override_for(self, header: str) -> CanonicalField | None:
         """Look up an override, tolerating whitespace differences in the header."""
@@ -110,6 +121,10 @@ def _load_county_config_file(path: Path) -> CountyConfig:
         surplus_column_declared="surplus_column" in raw,
         derived_surplus=derived,
         notes=str(raw.get("notes", "")),
+        fips_code=str(raw["fips_code"]) if raw.get("fips_code") else None,
+        source_type=_enum(path, raw, "source_type", CountySourceType),
+        source_url=str(raw["source_url"]) if raw.get("source_url") else None,
+        publishing_frequency=_enum(path, raw, "publishing_frequency", PublishingFrequency),
     )
     logger.debug(
         "county_config_loaded",
@@ -118,3 +133,25 @@ def _load_county_config_file(path: Path) -> CountyConfig:
         surplus_column=config.surplus_column,
     )
     return config
+
+
+def _enum[E: Enum](path: Path, raw: dict[str, Any], key: str, enum: type[E]) -> E:
+    """Read an optional enum-valued key, defaulting when it is absent.
+
+    A typo is rejected rather than defaulted: silently treating `source_type: bulk_downlod`
+    as a manual upload would misdescribe where a county's data comes from.
+    """
+    value = raw.get(key)
+    if value is None:
+        return enum(_ENUM_DEFAULTS[enum])
+    try:
+        return enum(str(value))
+    except ValueError as exc:
+        options = [member.value for member in enum]
+        raise CountyConfigError(f"{path}: {key} must be one of {options}, got {value!r}") from exc
+
+
+_ENUM_DEFAULTS: dict[type[Enum], str] = {
+    CountySourceType: CountySourceType.MANUAL_UPLOAD.value,
+    PublishingFrequency: PublishingFrequency.IRREGULAR.value,
+}

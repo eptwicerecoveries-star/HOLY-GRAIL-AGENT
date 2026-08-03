@@ -31,4 +31,20 @@ derived_surplus: null
 #     formula: winning_bid - judgment_amount
 #     source_note: "Confirmed with county treasurer 2026-01-15"
 
+# --- Registration ------------------------------------------------------------------------
+# Where this county's list comes from. None of this affects how a document is read; it is
+# recorded on the county the first time cases are written for it, so the team can see how
+# each county is sourced and how often to look again.
+#
+# source_type is one of: bulk_download, sftp, email, api, manual_upload
+# Prefer an official API or a bulk download over anything that has to be scraped, and record
+# which it was here. A typo is rejected rather than defaulted -- describing an API feed as a
+# manual upload would be a quiet lie about where the data came from.
+fips_code: null
+source_type: manual_upload
+source_url: null
+
+# One of: daily, weekly, monthly, quarterly, annual, irregular
+publishing_frequency: irregular
+
 notes: ""
