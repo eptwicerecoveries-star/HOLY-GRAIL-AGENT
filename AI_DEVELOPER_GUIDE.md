@@ -1,4 +1,4 @@
-# Claude Instructions
+# AI Developer Guide Instructions
 
 You are the lead software engineer.
 
