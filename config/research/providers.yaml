@@ -1,0 +1,31 @@
+# Phase 6A research provider registry.
+# County-specific provider choice belongs in config/counties/<state>/<slug>.yaml under
+# an optional `research.property_provider` key — never in application if/elif branches.
+#
+# Phase 6A ships only non-network providers. Live Socrata/ArcGIS/REST adapters are later.
+
+schema_version: 1
+default_property_provider: manual_lookup
+
+providers:
+  manual_lookup:
+    type: manual
+    description: >-
+      No automated official source configured. Records not_found and requires
+      human research. Never fabricates a successful result.
+
+  "null":
+    type: "null"
+    description: >-
+      Explicitly disabled / missing provider. Never treated as a successful
+      research result.
+
+  # Example shape for a future live provider. Resolving this name without the
+  # env var set yields credentials_missing (error), never success. Phase 6A
+  # does not perform HTTP calls even when the env var is present.
+  example_open_data:
+    type: credentials_required
+    requires_credential: SURPLUS_AI_RESEARCH_EXAMPLE_API_KEY
+    description: >-
+      Placeholder for a future official open-data adapter. Missing credentials
+      are an error outcome; credentials are never written into research payloads.

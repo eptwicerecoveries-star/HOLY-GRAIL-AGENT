@@ -1,0 +1,108 @@
+{
+  "success": {
+    "status": "success",
+    "found": true,
+    "requires_human_review": false,
+    "source_url": "https://example.invalid/open-data/parcels/01-234567",
+    "notes": "Fixture success outcome — not a live network call.",
+    "evidence": [
+      {
+        "field": "mailing_address",
+        "original_value": "123 MAIN ST, ANYTOWN MD 21001",
+        "normalized_value": "123 MAIN ST ANYTOWN MD 21001",
+        "source": "fixture_open_data",
+        "source_url": "https://example.invalid/open-data/parcels/01-234567",
+        "retrieved_at": "2026-08-11T12:00:00+00:00",
+        "confidence": 0.95,
+        "method": "open_data",
+        "requires_human_verification": false,
+        "owner_type_context": "individual"
+      }
+    ],
+    "raw_response": {
+      "parcel": "01-234567",
+      "owner": "STEFFEN, DEBORAH"
+    }
+  },
+  "not_found": {
+    "status": "not_found",
+    "found": false,
+    "requires_human_review": true,
+    "notes": "Fixture not_found outcome.",
+    "evidence": [],
+    "raw_response": {"matches": 0}
+  },
+  "error": {
+    "status": "error",
+    "found": false,
+    "requires_human_review": true,
+    "error_code": "upstream_error",
+    "error_detail": "Fixture simulated provider failure.",
+    "evidence": [],
+    "raw_response": {"error": "unavailable"}
+  },
+  "malformed_missing_status": {
+    "found": true,
+    "evidence": []
+  },
+  "malformed_found_without_success": {
+    "status": "not_found",
+    "found": true,
+    "evidence": []
+  },
+  "secrets_must_redact": {
+    "status": "success",
+    "found": true,
+    "requires_human_review": false,
+    "evidence": [
+      {
+        "field": "mailing_address",
+        "original_value": "1 TEST RD",
+        "normalized_value": "1 TEST RD",
+        "source": "fixture_open_data",
+        "source_url": null,
+        "retrieved_at": "2026-08-11T12:00:00+00:00",
+        "confidence": 0.9,
+        "method": "open_data",
+        "requires_human_verification": false,
+        "owner_type_context": "individual"
+      }
+    ],
+    "raw_response": {
+      "api_key": "SUPER_SECRET_SHOULD_NOT_PERSIST",
+      "Authorization": "Bearer SECRET_TOKEN",
+      "parcel": "X"
+    }
+  },
+  "ambiguous_identity": {
+    "status": "success",
+    "found": true,
+    "requires_human_review": false,
+    "evidence": [
+      {
+        "field": "owner_name_on_record",
+        "original_value": "SMITH JOHN",
+        "normalized_value": "SMITH JOHN",
+        "source": "fixture_open_data",
+        "source_url": null,
+        "retrieved_at": "2026-08-11T12:00:00+00:00",
+        "confidence": 0.5,
+        "method": "open_data",
+        "requires_human_verification": false,
+        "owner_type_context": "individual"
+      },
+      {
+        "field": "owner_name_on_record",
+        "original_value": "SMITH JON",
+        "normalized_value": "SMITH JON",
+        "source": "fixture_open_data",
+        "source_url": null,
+        "retrieved_at": "2026-08-11T12:00:00+00:00",
+        "confidence": 0.5,
+        "method": "open_data",
+        "requires_human_verification": false,
+        "owner_type_context": "individual"
+      }
+    ]
+  }
+}
