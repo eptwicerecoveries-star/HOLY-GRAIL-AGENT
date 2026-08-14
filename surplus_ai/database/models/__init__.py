@@ -18,6 +18,7 @@ from surplus_ai.database.models.parsing_profile import ParsingProfileVersion
 from surplus_ai.database.models.property import Property
 from surplus_ai.database.models.raw_surplus_row import RawSurplusRow
 from surplus_ai.database.models.research_result import ResearchResult
+from surplus_ai.database.models.research_review_item import ResearchReviewItem
 from surplus_ai.database.models.surplus_case import SurplusCase
 from surplus_ai.database.models.user import User
 
@@ -43,6 +44,7 @@ __all__ = [
     "Property",
     "RawSurplusRow",
     "ResearchResult",
+    "ResearchReviewItem",
     "SurplusCase",
     "User",
 ]

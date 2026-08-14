@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from surplus_ai.database.models.owner import Owner
     from surplus_ai.database.models.property import Property
     from surplus_ai.database.models.research_result import ResearchResult
+    from surplus_ai.database.models.research_review_item import ResearchReviewItem
 
 
 class SurplusCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -102,6 +103,9 @@ class SurplusCase(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="surplus_case", cascade="all, delete-orphan"
     )
     research_results: Mapped[list[ResearchResult]] = relationship(
+        back_populates="surplus_case", cascade="all, delete-orphan"
+    )
+    research_review_items: Mapped[list[ResearchReviewItem]] = relationship(
         back_populates="surplus_case", cascade="all, delete-orphan"
     )
     lead: Mapped[Lead | None] = relationship(

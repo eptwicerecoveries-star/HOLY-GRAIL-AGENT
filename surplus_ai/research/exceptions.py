@@ -19,3 +19,7 @@ class ResearchPersistenceError(ResearchError):
 
 class CandidateSelectionError(ResearchError):
     """A research target could not be selected."""
+
+
+class ResearchReviewError(ResearchError):
+    """A research review item could not be queued or closed."""

@@ -17,9 +17,9 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A+6B implemented; 6C+ not started** | 6A: research package skeleton, Manual/Null providers, registry, candidate selection, append-only `ResearchResult` persistence, CLI. 6B: fail-closed ResearchResult cache, nested reliability config, in-process token-bucket pacing, bounded transient retries, `--no-cache`. No live providers, no Property/Lead/Contact/compliance mutations, no migrations. See `docs/architecture/PHASE6_RESEARCH_DESIGN.md`. |
+| 6 | Research & Enrichment | **6A+6B+6C implemented; 6D+ not started** | 6A: research package skeleton, Manual/Null providers, registry, candidate selection, append-only `ResearchResult` persistence, CLI. 6B: fail-closed ResearchResult cache, nested reliability config, in-process token-bucket pacing, bounded transient retries, `--no-cache`. 6C: `research_review_items` human review queue, additive migration, atomic pending-only close, no Contact/Lead/Property/compliance mutations, no live providers. See `docs/architecture/PHASE6_RESEARCH_DESIGN.md`. |
 
-**Not implemented (do not treat as present):** live property/skip-trace providers, `research_review_items`, Contact materialization, `scoring/`, `crm/`, `reports/`, `integrations/` (Airtable), `pipeline/` orchestration, `dashboard/`.
+**Not implemented (do not treat as present):** live property/skip-trace providers, Contact materialization, `scoring/`, `crm/`, `reports/`, `integrations/` (Airtable), `pipeline/` orchestration, `dashboard/`.
 
 ---
 
@@ -49,7 +49,7 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 3. Classifier
 4. Compliance framework
 5. Lead creation
-6. Research & Enrichment — **6A+6B complete; next approval gate is 6C**
+6. Research & Enrichment — **6A+6B+6C complete; next approval gate is 6D**
 7+ Scoring, CRM/Airtable, reports, orchestration, multi-county hardening, dashboard, etc. (see README and `ARCHITECTURE.md` §10 status note)
 
 **Original `ARCHITECTURE.md` §10 roadmap (design-era numbering):**
@@ -67,6 +67,6 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 
 ## Next objective
 
-**Phase 6C (not started — requires separate approval):** `research_review_items` / human review queue.
+**Phase 6D (not started — requires separate approval):** live Socrata/ArcGIS/REST property providers.
 
-Do not begin 6C until explicitly approved. Do not treat empty compliance YAML as a reason to bypass the fail-closed gate.
+Do not begin 6D until explicitly approved. Do not treat empty compliance YAML as a reason to bypass the fail-closed gate.

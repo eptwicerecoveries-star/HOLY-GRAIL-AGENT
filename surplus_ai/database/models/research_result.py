@@ -13,6 +13,7 @@ from surplus_ai.database.models.enums import ResearchStatus, pg_enum
 from surplus_ai.database.models.mixins import UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from surplus_ai.database.models.research_review_item import ResearchReviewItem
     from surplus_ai.database.models.surplus_case import SurplusCase
 
 
@@ -33,3 +34,6 @@ class ResearchResult(Base, UUIDPrimaryKeyMixin):
     )
 
     surplus_case: Mapped[SurplusCase] = relationship(back_populates="research_results")
+    review_items: Mapped[list[ResearchReviewItem]] = relationship(
+        back_populates="research_result"
+    )

@@ -103,6 +103,13 @@ class ProviderRegistry:
         override = spec.reliability if spec is not None else None
         return merge_reliability(self._file.reliability, override)
 
+    def provider_type(self, provider_name: str) -> str | None:
+        """Configured provider type, or None when the name is unconfigured/custom."""
+        spec = self._file.providers.get(provider_name)
+        if spec is None:
+            return None
+        return spec.type
+
     def resolve_for_county(self, state: str, county_slug: str) -> AbstractPropertyRecordProvider:
         county_cfg = load_county_research_config(
             state, county_slug, counties_dir=self._counties_dir

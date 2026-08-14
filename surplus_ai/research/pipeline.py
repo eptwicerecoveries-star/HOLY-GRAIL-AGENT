@@ -23,6 +23,7 @@ from surplus_ai.research.persistence import ResearchResultWriter, build_request_
 from surplus_ai.research.rate_limit import TokenBucketRateLimiter
 from surplus_ai.research.registry import ProviderRegistry
 from surplus_ai.research.retry import run_with_retry
+from surplus_ai.research.review import ResearchReviewQueue
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +31,7 @@ __all__ = ["ResearchPipeline", "ResearchError", "load_case_with_relations"]
 
 
 class ResearchPipeline:
-    """Property research. Persists ResearchResult rows only.
+    """Property research. Persists ResearchResult rows and may enqueue review items.
 
     Does not update Property, SurplusCase.status, ComplianceEvaluation, Contact, or Lead.
     Does not change pending-candidate selection.
@@ -51,6 +52,7 @@ class ResearchPipeline:
         self._candidates = CandidateSelector(session)
         self._writer = ResearchResultWriter(session)
         self._cache = ResearchResultCache(session, wall_clock=wall_clock)
+        self._reviews = ResearchReviewQueue(session, registry=self._registry)
         self._use_cache_default = use_cache
         self._monotonic = monotonic
         self._sleeper = sleeper
@@ -194,12 +196,14 @@ class ResearchPipeline:
             before_attempt=limiter.acquire,
             sleeper=self._sleeper,
         )
-        return self._writer.persist(
+        row = self._writer.persist(
             surplus_case_id=candidate.surplus_case_id,
             provider_name=provider.name,
             query=query,
             outcome=outcome,
         )
+        self._reviews.enqueue_for_result(row)
+        return row
 
 
 def load_case_with_relations(session: Session, case_id: uuid.UUID) -> SurplusCase:

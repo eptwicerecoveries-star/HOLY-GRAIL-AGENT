@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → stop → approve 6C separately.
+5. **Incremental delivery:** 6A → 6B → 6C → stop → approve 6D separately.
 
 ## Phase 6A (implemented)
 
@@ -99,9 +99,27 @@ outcome **returned by a provider** remains distinct evidence and follows the ret
 or ERROR with `ProviderOutcome.retryable is True` (default False). Injected sleeper; unit
 tests must not really sleep.
 
+## Phase 6C (implemented)
+
+Human research review queue (`research_review_items`). Evidence/workflow only.
+
+- Enqueue only after a **new** persisted `ResearchResult` whose
+  `response_payload.requires_human_review` is exactly JSON `true`.
+- Cache hits, limiter waits, and unflagged results do not enqueue.
+- Open-item identity: `(surplus_case_id, provider, reason)` while `status = pending`.
+- Triggering `research_result_id` is frozen. `review show` warns if a newer result exists
+  for the same case+provider; it does not retarget or auto-reopen.
+- Reuse `review_status`: pending → resolved | rejected. No `IN_REVIEW`.
+- Resolutions: `evidence_usable`, `evidence_insufficient`, `needs_additional_research`,
+  `conflict_unresolved`, `not_relevant`. `evidence_usable` is not legal entitlement.
+- Close is an atomic pending-only UPDATE. A second close fails; it does not overwrite.
+- Duplicate enqueue races use a SQLAlchemy savepoint (`begin_nested`) so the outer
+  ResearchResult persist is not rolled back.
+- No backfill of 6A/6B rows. No Contact/Lead/Property/Compliance writes. No `AuditLog`.
+- CLI: `surplusai research review list|show|resolve`
+
 ## Later phases (not started)
 
-- 6C: `research_review_items`
 - 6D+: live Socrata/ArcGIS/REST
 - 6E: local enrichment apply paths
 - 6F: skip-trace + Contact materialization when Lead exists

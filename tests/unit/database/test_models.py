@@ -77,6 +77,7 @@ EXPECTED_TABLES = {
     "properties",
     "raw_surplus_rows",
     "research_results",
+    "research_review_items",
     "surplus_cases",
     "users",
 }
@@ -109,7 +110,7 @@ def _case(county: County, **overrides: object) -> SurplusCase:
 
 def test_all_tables_are_registered() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 23
+    assert len(EXPECTED_TABLES) == 24
 
 
 def test_schema_matches_models(engine, _schema) -> None:  # type: ignore[no-untyped-def]

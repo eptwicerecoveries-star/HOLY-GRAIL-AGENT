@@ -97,6 +97,30 @@ class ReviewStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class ResearchReviewReason(str, Enum):
+    """Why a persisted research result was queued for a person.
+
+    Workflow signal only. Never a legal claimant, heir, entitlement, or
+    contactability conclusion.
+    """
+
+    AMBIGUOUS_IDENTITY = "ambiguous_identity"
+    COMPLEX_OWNER_CONTEXT = "complex_owner_context"
+    MANUAL_RESEARCH_REQUIRED = "manual_research_required"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+    PROVIDER_FAILURE = "provider_failure"
+
+
+class ResearchReviewResolution(str, Enum):
+    """Human evidence/workflow conclusion. Never legal entitlement or outreach."""
+
+    EVIDENCE_USABLE = "evidence_usable"
+    EVIDENCE_INSUFFICIENT = "evidence_insufficient"
+    NEEDS_ADDITIONAL_RESEARCH = "needs_additional_research"
+    CONFLICT_UNRESOLVED = "conflict_unresolved"
+    NOT_RELEVANT = "not_relevant"
+
+
 class SurplusCaseStatus(str, Enum):
     NEW = "new"
     NORMALIZED = "normalized"

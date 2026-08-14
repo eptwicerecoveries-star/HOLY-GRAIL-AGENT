@@ -13,8 +13,8 @@ from tests.conftest import TEST_DATABASE_URL
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-EXPECTED_TABLE_COUNT = 23
-ENUM_TYPE_COUNT = 20
+EXPECTED_TABLE_COUNT = 24
+ENUM_TYPE_COUNT = 22
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""Phase 6 research & enrichment package (6B: cache, in-process pacing, retries)."""
+"""Phase 6 research & enrichment package (6C: human research review queue)."""
 
 from surplus_ai.research.pipeline import ResearchPipeline
 from surplus_ai.research.registry import ProviderRegistry
