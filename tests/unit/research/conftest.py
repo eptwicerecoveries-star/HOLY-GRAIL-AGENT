@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from surplus_ai.database.models.surplus_case import SurplusCase
 from surplus_ai.research.models import PropertyLookupQuery, ProviderOutcome
 from surplus_ai.research.persistence import parse_outcome_dict
 from surplus_ai.research.providers.base import AbstractPropertyRecordProvider
+from surplus_ai.research.registry import ProviderRegistry
 
 FIXTURES_PATH = (
     Path(__file__).resolve().parents[2] / "fixtures" / "research" / "provider_outcomes.json"
@@ -105,13 +106,93 @@ class FixtureProvider(AbstractPropertyRecordProvider):
     def __init__(self, name: str, outcome: ProviderOutcome) -> None:
         self.name = name
         self._outcome = outcome
+        self.calls = 0
 
     def supports(self, state: str, county_slug: str) -> bool:
         return True
 
     def lookup(self, query: PropertyLookupQuery) -> ProviderOutcome:
+        self.calls += 1
         return self._outcome
+
+
+class SequenceProvider(AbstractPropertyRecordProvider):
+    """Returns a sequence of outcomes; last outcome repeats if exhausted."""
+
+    def __init__(self, name: str, outcomes: list[ProviderOutcome]) -> None:
+        self.name = name
+        self._outcomes = outcomes
+        self.calls = 0
+
+    def supports(self, state: str, county_slug: str) -> bool:
+        return True
+
+    def lookup(self, query: PropertyLookupQuery) -> ProviderOutcome:
+        index = min(self.calls, len(self._outcomes) - 1)
+        self.calls += 1
+        return self._outcomes[index]
+
+
+class FakeClock:
+    """Advances only when sleep() is called. No real waiting."""
+
+    def __init__(self, start: float = 1000.0) -> None:
+        self.t = start
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.t
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.t += seconds
+
+    def wall(self) -> datetime:
+        return datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=self.t)
 
 
 def fixture_outcome(fixtures: dict[str, Any], key: str) -> ProviderOutcome:
     return parse_outcome_dict(fixtures[key])
+
+
+def write_providers_yaml(
+    tmp_path: Path,
+    *,
+    reliability: dict[str, Any] | None = None,
+    providers: dict[str, Any] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> Path:
+    import yaml
+
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "default_property_provider": "manual_lookup",
+        "providers": providers
+        or {
+            "manual_lookup": {"type": "manual", "description": "test"},
+            "null": {"type": "null", "description": "test"},
+        },
+    }
+    if reliability is not None:
+        payload["reliability"] = reliability
+    if extra:
+        payload.update(extra)
+    path = tmp_path / "providers.yaml"
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    return path
+
+
+def registry_from_yaml(tmp_path: Path, **kwargs: Any) -> ProviderRegistry:
+    path = write_providers_yaml(tmp_path, **kwargs)
+    return ProviderRegistry(config_path=path, counties_dir=tmp_path / "counties")
+
+
+def force_provider(registry: ProviderRegistry, name: str) -> None:
+    registry.resolve_for_county = lambda _s, _c: registry.resolve(name)  # type: ignore[method-assign]
+
+
+SHIPPED_RELIABILITY: dict[str, Any] = {
+    "cache": {"ttl_seconds": 86400},
+    "retry": {"max_attempts": 3, "backoff_seconds": 0.5},
+    "rate_limit": {"per_second": 0},
+}

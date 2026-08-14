@@ -85,6 +85,7 @@ class ResearchResultWriter:
                 evidence=(),
                 notes="Provider returned a malformed outcome; recorded as error.",
                 provider_status=ProviderOutcomeStatus.ERROR,
+                cacheable=False,
                 raw_response=redact_secrets(outcome.raw_response),
             )
             db_status = ResearchStatus.ERROR
@@ -139,6 +140,16 @@ def build_request_payload(*, provider_name: str, query: PropertyLookupQuery) -> 
     )
 
 
+def persisted_cacheable(outcome: ProviderOutcome) -> bool:
+    """Explicit persist flag: only SUCCESS/NOT_FOUND with cacheable=True become true."""
+    if outcome.status not in (
+        ProviderOutcomeStatus.SUCCESS,
+        ProviderOutcomeStatus.NOT_FOUND,
+    ):
+        return False
+    return outcome.cacheable is True
+
+
 def build_response_payload(outcome: ProviderOutcome) -> ResponsePayload:
     return ResponsePayload(
         found=outcome.found,
@@ -150,6 +161,7 @@ def build_response_payload(outcome: ProviderOutcome) -> ResponsePayload:
         evidence=outcome.evidence,
         notes=outcome.notes,
         provider_status=outcome.status,
+        cacheable=persisted_cacheable(outcome),
         raw_response=redact_secrets(outcome.raw_response),
     )
 

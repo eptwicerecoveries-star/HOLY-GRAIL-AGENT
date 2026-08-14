@@ -1,11 +1,22 @@
-# Phase 6A research provider registry.
+# Phase 6B research provider registry.
 # County-specific provider choice belongs in config/counties/<state>/<slug>.yaml under
 # an optional `research.property_provider` key — never in application if/elif branches.
 #
-# Phase 6A ships only non-network providers. Live Socrata/ArcGIS/REST adapters are later.
+# Phase 6B ships only non-network providers. Live Socrata/ArcGIS/REST adapters are later.
+# Omitted `reliability` on a custom config file keeps conservative defaults
+# (cache TTL 0, max_attempts 1, unlimited rate limit).
 
 schema_version: 1
 default_property_provider: manual_lookup
+
+reliability:
+  cache:
+    ttl_seconds: 86400
+  retry:
+    max_attempts: 3
+    backoff_seconds: 0.5
+  rate_limit:
+    per_second: 0
 
 providers:
   manual_lookup:
@@ -21,7 +32,7 @@ providers:
       research result.
 
   # Example shape for a future live provider. Resolving this name without the
-  # env var set yields credentials_missing (error), never success. Phase 6A
+  # env var set yields credentials_missing (error), never success. Phase 6B
   # does not perform HTTP calls even when the env var is present.
   example_open_data:
     type: credentials_required

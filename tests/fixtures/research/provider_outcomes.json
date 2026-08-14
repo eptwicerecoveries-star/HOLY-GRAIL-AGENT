@@ -74,6 +74,49 @@
       "parcel": "X"
     }
   },
+  "timeout": {
+    "status": "timeout",
+    "found": false,
+    "requires_human_review": true,
+    "error_code": "timeout",
+    "error_detail": "Fixture simulated provider timeout.",
+    "cacheable": false,
+    "retryable": false,
+    "evidence": [],
+    "raw_response": {"error": "timeout"}
+  },
+  "rate_limited": {
+    "status": "rate_limited",
+    "found": false,
+    "requires_human_review": true,
+    "error_code": "rate_limited",
+    "error_detail": "Fixture simulated upstream rate limit.",
+    "cacheable": false,
+    "retryable": false,
+    "evidence": [],
+    "raw_response": {"error": "rate_limited"}
+  },
+  "error_retryable": {
+    "status": "error",
+    "found": false,
+    "requires_human_review": true,
+    "error_code": "upstream_error",
+    "error_detail": "Fixture simulated transient error.",
+    "cacheable": false,
+    "retryable": true,
+    "evidence": [],
+    "raw_response": {"error": "transient"}
+  },
+  "skipped": {
+    "status": "skipped",
+    "found": false,
+    "requires_human_review": true,
+    "error_code": "provider_not_configured",
+    "error_detail": "Fixture skipped outcome.",
+    "cacheable": false,
+    "retryable": false,
+    "evidence": []
+  },
   "ambiguous_identity": {
     "status": "success",
     "found": true,

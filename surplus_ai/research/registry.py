@@ -16,6 +16,11 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from surplus_ai.research.exceptions import ProviderNotFoundError, ResearchConfigError
+from surplus_ai.research.policy import (
+    ReliabilityPolicy,
+    ReliabilityPolicyPatch,
+    merge_reliability,
+)
 from surplus_ai.research.providers.base import AbstractPropertyRecordProvider
 from surplus_ai.research.providers.credentials_missing import CredentialsMissingProvider
 from surplus_ai.research.providers.manual import ManualLookupProvider
@@ -31,18 +36,20 @@ ProviderTypeName = Literal["manual", "null", "credentials_required"]
 
 
 class ProviderSpec(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     type: ProviderTypeName
     description: str = ""
     requires_credential: str | None = None
+    reliability: ReliabilityPolicyPatch | None = None
 
 
 class ProvidersFile(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: int = 1
     default_property_provider: str = "manual_lookup"
+    reliability: ReliabilityPolicy = Field(default_factory=ReliabilityPolicy)
     providers: dict[str, ProviderSpec] = Field(default_factory=dict)
 
     @field_validator("schema_version")
@@ -86,6 +93,15 @@ class ProviderRegistry:
     def register(self, provider: AbstractPropertyRecordProvider) -> None:
         """Register a provider instance (tests / future adapters)."""
         self._custom[provider.name] = provider
+
+    @property
+    def global_reliability(self) -> ReliabilityPolicy:
+        return self._file.reliability
+
+    def reliability_for(self, provider_name: str) -> ReliabilityPolicy:
+        spec = self._file.providers.get(provider_name)
+        override = spec.reliability if spec is not None else None
+        return merge_reliability(self._file.reliability, override)
 
     def resolve_for_county(self, state: str, county_slug: str) -> AbstractPropertyRecordProvider:
         county_cfg = load_county_research_config(

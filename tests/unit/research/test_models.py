@@ -62,3 +62,22 @@ def test_payload_schema_version_is_one() -> None:
     )
     assert req.schema_version == PAYLOAD_SCHEMA_VERSION == 1
     assert resp.schema_version == 1
+
+
+def test_response_payload_cacheable_defaults_none() -> None:
+    resp = ResponsePayload(
+        found=False,
+        requires_human_review=True,
+        provider_status=ProviderOutcomeStatus.NOT_FOUND,
+    )
+    assert resp.cacheable is None
+
+
+def test_provider_outcome_retryable_defaults_false() -> None:
+    outcome = ProviderOutcome(
+        status=ProviderOutcomeStatus.ERROR,
+        found=False,
+        requires_human_review=True,
+    )
+    assert outcome.retryable is False
+    assert outcome.cacheable is True

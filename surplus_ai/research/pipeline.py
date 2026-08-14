@@ -1,4 +1,4 @@
-"""Research pipeline skeleton: resolve provider → lookup → append ResearchResult."""
+"""Research pipeline: cache → pace → lookup/retry → append ResearchResult."""
 
 from __future__ import annotations
 
@@ -10,15 +10,19 @@ from sqlalchemy.orm import Session, selectinload
 
 from surplus_ai.database.models.research_result import ResearchResult
 from surplus_ai.database.models.surplus_case import SurplusCase
+from surplus_ai.research.cache import ResearchResultCache
 from surplus_ai.research.candidate import CandidateSelector
+from surplus_ai.research.clock import MonotonicFn, SleeperFn, WallClockFn
 from surplus_ai.research.exceptions import CandidateSelectionError, ResearchError
 from surplus_ai.research.models import (
     PropertyLookupQuery,
     ResearchCandidate,
     ResearchRunSummary,
 )
-from surplus_ai.research.persistence import ResearchResultWriter
+from surplus_ai.research.persistence import ResearchResultWriter, build_request_payload
+from surplus_ai.research.rate_limit import TokenBucketRateLimiter
 from surplus_ai.research.registry import ProviderRegistry
+from surplus_ai.research.retry import run_with_retry
 
 logger = structlog.get_logger(__name__)
 
@@ -26,24 +30,40 @@ __all__ = ["ResearchPipeline", "ResearchError", "load_case_with_relations"]
 
 
 class ResearchPipeline:
-    """Phase 6A property research. Persists ResearchResult rows only.
+    """Property research. Persists ResearchResult rows only.
 
     Does not update Property, SurplusCase.status, ComplianceEvaluation, Contact, or Lead.
+    Does not change pending-candidate selection.
     """
 
     def __init__(
         self,
         session: Session,
         registry: ProviderRegistry | None = None,
+        *,
+        use_cache: bool = True,
+        monotonic: MonotonicFn | None = None,
+        sleeper: SleeperFn | None = None,
+        wall_clock: WallClockFn | None = None,
     ) -> None:
         self._session = session
         self._registry = registry or ProviderRegistry()
         self._candidates = CandidateSelector(session)
         self._writer = ResearchResultWriter(session)
+        self._cache = ResearchResultCache(session, wall_clock=wall_clock)
+        self._use_cache_default = use_cache
+        self._monotonic = monotonic
+        self._sleeper = sleeper
+        self._limiters: dict[tuple[str, float], TokenBucketRateLimiter] = {}
 
-    def research_case(self, case_id: uuid.UUID) -> ResearchResult:
+    def research_case(
+        self,
+        case_id: uuid.UUID,
+        *,
+        use_cache: bool | None = None,
+    ) -> ResearchResult:
         candidate = self._candidates.get_case_candidate(case_id)
-        return self._run_one(candidate)
+        return self._run_one(candidate, use_cache=self._cache_enabled(use_cache))
 
     def research_pending(
         self,
@@ -51,14 +71,16 @@ class ResearchPipeline:
         state: str | None = None,
         county_slug: str | None = None,
         limit: int = 100,
+        use_cache: bool | None = None,
     ) -> tuple[ResearchRunSummary, list[ResearchResult]]:
         candidates = self._candidates.pending(
             state=state, county_slug=county_slug, limit=limit
         )
+        enabled = self._cache_enabled(use_cache)
         results: list[ResearchResult] = []
         success = not_found = error = 0
         for candidate in candidates:
-            row = self._run_one(candidate)
+            row = self._run_one(candidate, use_cache=enabled)
             results.append(row)
             if row.status.value == "success":
                 success += 1
@@ -108,7 +130,27 @@ class ResearchPipeline:
             stmt = stmt.where(County.slug == county_slug.strip().lower())
         return list(self._session.scalars(stmt).all())
 
-    def _run_one(self, candidate: ResearchCandidate) -> ResearchResult:
+    def _cache_enabled(self, use_cache: bool | None) -> bool:
+        return self._use_cache_default if use_cache is None else use_cache
+
+    def _limiter(self, provider_name: str, per_second: float) -> TokenBucketRateLimiter:
+        key = (provider_name, per_second)
+        limiter = self._limiters.get(key)
+        if limiter is None:
+            limiter = TokenBucketRateLimiter(
+                per_second,
+                monotonic=self._monotonic,
+                sleeper=self._sleeper,
+            )
+            self._limiters[key] = limiter
+        return limiter
+
+    def _run_one(
+        self,
+        candidate: ResearchCandidate,
+        *,
+        use_cache: bool,
+    ) -> ResearchResult:
         query = PropertyLookupQuery(
             state=candidate.state,
             county_slug=candidate.county_slug,
@@ -120,13 +162,38 @@ class ResearchPipeline:
             surplus_case_id=candidate.surplus_case_id,
         )
         provider = self._registry.resolve_for_county(candidate.state, candidate.county_slug)
+        policy = self._registry.reliability_for(provider.name)
+        request = build_request_payload(provider_name=provider.name, query=query)
+
+        if use_cache:
+            hit = self._cache.get(
+                surplus_case_id=candidate.surplus_case_id,
+                provider=provider.name,
+                cache_key=request.cache_key,
+                ttl_seconds=policy.cache.ttl_seconds,
+            )
+            if hit is not None:
+                logger.info(
+                    "research_cache_hit",
+                    case_id=str(candidate.surplus_case_id),
+                    provider=provider.name,
+                    research_result_id=str(hit.id),
+                )
+                return hit
+
+        limiter = self._limiter(provider.name, policy.rate_limit.per_second)
         logger.info(
             "research_lookup_start",
             case_id=str(candidate.surplus_case_id),
             provider=provider.name,
             selection_reason=candidate.selection_reason,
         )
-        outcome = provider.lookup(query)
+        outcome = run_with_retry(
+            lambda: provider.lookup(query),
+            policy.retry,
+            before_attempt=limiter.acquire,
+            sleeper=self._sleeper,
+        )
         return self._writer.persist(
             surplus_case_id=candidate.surplus_case_id,
             provider_name=provider.name,

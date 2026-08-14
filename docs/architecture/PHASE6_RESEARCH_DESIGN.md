@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → stop → approve 6B separately.
+5. **Incremental delivery:** 6A → 6B → stop → approve 6C separately.
 
 ## Phase 6A (implemented)
 
@@ -48,9 +48,59 @@ method, and human-verification requirement.
 
 Missing provider configuration and missing credentials are never stored as `success`.
 
+## Phase 6B (implemented)
+
+Cache + in-process rate limiting + bounded transient retries. Still **no** live HTTP
+providers, **no** migrations, **no** new ORM models, **no** Contact/Lead/Property/Compliance
+writes, and **no** change to `CandidateSelector.pending()`.
+
+### Reliability config (`config/research/providers.yaml`)
+
+Shipped policy:
+
+```yaml
+reliability:
+  cache:
+    ttl_seconds: 86400
+  retry:
+    max_attempts: 3
+    backoff_seconds: 0.5
+  rate_limit:
+    per_second: 0
+```
+
+Omitted `reliability` on a custom file keeps conservative defaults: TTL 0, max_attempts 1,
+nonnegative backoff default 0, per_second 0 (unlimited). Per-provider `reliability` patches
+inherit omitted nested fields from the global policy. Unknown keys and malformed types fail
+closed (`extra='forbid'`; integers/numbers are not coerced from strings or bools).
+
+### Cache (read-only over existing `ResearchResult` rows)
+
+- Identity: surplus case + provider + request `cache_key`.
+- Hit only when `response_payload.cacheable` is JSON `true` and the row is SUCCESS or
+  NOT_FOUND with `provider_status` success/not_found.
+- Phase 6A rows missing `cacheable` are misses. 6B writes `cacheable` explicitly true or false.
+- `ResponsePayload.cacheable` defaults to `None` (not `True`).
+- Ordering: `fetched_at DESC`, `id DESC`. Hits return the existing row; no update, no new
+  row, no `fetched_at` refresh.
+- `--no-cache` bypasses reads only; the provider is still called and a new row is still
+  persisted with the normal `cacheable` value.
+
+### Local rate limiter (throttling, not evidence)
+
+Process-local capacity-1 token bucket, initialized with one token. `per_second: 0` is
+unlimited. When a token is unavailable, wait via the injected monotonic clock + sleeper.
+Local pacing never fabricates or persists RATE_LIMITED / ERROR / SUCCESS. A RATE_LIMITED
+outcome **returned by a provider** remains distinct evidence and follows the retry policy.
+
+### Retries
+
+`max_attempts` includes the initial try. Retry only TIMEOUT, provider-returned RATE_LIMITED,
+or ERROR with `ProviderOutcome.retryable is True` (default False). Injected sleeper; unit
+tests must not really sleep.
+
 ## Later phases (not started)
 
-- 6B: cache, rate limits, retries
 - 6C: `research_review_items`
 - 6D+: live Socrata/ArcGIS/REST
 - 6E: local enrichment apply paths

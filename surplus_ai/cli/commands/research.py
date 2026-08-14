@@ -13,7 +13,7 @@ from surplus_ai.utils.exceptions import AppError
 
 logger = structlog.get_logger(__name__)
 
-app = typer.Typer(help="Property-record research (Phase 6A: ResearchResult persistence only).")
+app = typer.Typer(help="Property-record research (Phase 6B: cache, pacing, retries).")
 
 
 @app.command("providers")
@@ -45,6 +45,11 @@ def list_providers() -> None:
 @app.command("case")
 def research_case(
     case_id: str = typer.Argument(..., help="Surplus case UUID."),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass cache reads; still call the provider and persist the new result.",
+    ),
 ) -> None:
     """Run property research for one case and append a ResearchResult row."""
     try:
@@ -55,7 +60,7 @@ def research_case(
 
     try:
         with session_scope() as session:
-            row = ResearchPipeline(session).research_case(cid)
+            row = ResearchPipeline(session).research_case(cid, use_cache=not no_cache)
             status = row.status.value
             provider = row.provider
             result_id = row.id
@@ -78,12 +83,20 @@ def research_pending(
     state: str | None = typer.Option(None, "--state", help="Two-letter state filter."),
     county: str | None = typer.Option(None, "--county", help="County slug filter."),
     limit: int = typer.Option(100, "--limit", min=1, help="Max cases to research."),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass cache reads; still call the provider and persist each new result.",
+    ),
 ) -> None:
-    """Research pending candidates; appends one ResearchResult per case."""
+    """Research pending candidates; appends one ResearchResult per newly obtained outcome.
+
+    Candidate selection is unchanged from Phase 6A (not "unresearched only").
+    """
     try:
         with session_scope() as session:
             summary, _rows = ResearchPipeline(session).research_pending(
-                state=state, county_slug=county, limit=limit
+                state=state, county_slug=county, limit=limit, use_cache=not no_cache
             )
             lines = summary.summary_lines()
     except (AppError, ResearchError) as exc:

@@ -76,6 +76,7 @@ class ProviderOutcome(BaseModel):
     error_detail: str | None = None
     requires_human_review: bool = False
     cacheable: bool = True
+    retryable: bool = False
     notes: str | None = None
     raw_response: dict[str, Any] | None = None
 
@@ -150,6 +151,8 @@ class ResponsePayload(BaseModel):
     evidence: tuple[EvidenceAtom, ...] = ()
     notes: str | None = None
     provider_status: ProviderOutcomeStatus
+    # Explicit JSON true/false in 6B. Missing/None on 6A rows is a cache miss.
+    cacheable: bool | None = None
     # Sanitized provider echo only — no credentials.
     raw_response: dict[str, Any] | None = None
 
