@@ -7,12 +7,16 @@ import os
 import re
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from surplus_ai.research.endpoint import (
+    parse_socrata_number_identity,
     socrata_resource_url,
+    soql_number_literal,
     soql_string_literal,
     validate_socrata_dataset_id,
     validate_socrata_domain,
@@ -47,6 +51,9 @@ _ERROR_DETAIL = {
         "Live Socrata lookup requires a parcel identifier, or a configured account "
         "identifier on the query. Owner-only and address-only search are not enabled."
     ),
+    "invalid_identity_format": (
+        "The lookup identifier is not valid for the configured Socrata value type."
+    ),
     "timeout": "The provider request timed out.",
     "network_failure": "The provider connection failed.",
     "tls_failure": "TLS certificate validation failed. The request was not retried.",
@@ -67,6 +74,13 @@ _ERROR_DETAIL = {
 }
 
 
+class SocrataIdentityValueType(str, Enum):
+    """Configured SoQL identity literal type. Never inferred from a live API."""
+
+    TEXT = "text"
+    NUMBER = "number"
+
+
 class SocrataProviderOptions(BaseModel):
     """Strict Socrata adapter config. Unknown keys are rejected."""
 
@@ -82,6 +96,8 @@ class SocrataProviderOptions(BaseModel):
     record_id_field: str | None = None
     select_fields: tuple[str, ...] | None = None
     query_limit: int = Field(default=10, ge=1, le=_MAX_QUERY_LIMIT)
+    parcel_value_type: SocrataIdentityValueType = SocrataIdentityValueType.TEXT
+    account_value_type: SocrataIdentityValueType = SocrataIdentityValueType.TEXT
     source_organization: str | None = None
     verified_for_automated_access: bool = False
     access_reviewed_on: date | None = None
@@ -176,6 +192,13 @@ class SocrataProviderOptions(BaseModel):
             raise ValueError("query_limit must be an integer")
         return value
 
+    @field_validator("parcel_value_type", "account_value_type", mode="before")
+    @classmethod
+    def _identity_value_type(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise ValueError("identity value type must be 'text' or 'number'")
+        return value
+
     @model_validator(mode="after")
     def _verified_requires_metadata(self) -> SocrataProviderOptions:
         if self.verified_for_automated_access:
@@ -221,14 +244,30 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
 
         identity = self._identity(query)
         if identity is None:
+            if self._blank_number_identity(query):
+                return self._error(
+                    "invalid_identity_format",
+                    source_url=source_url,
+                    retryable=False,
+                    review=True,
+                )
             return self._error(
                 "missing_identity",
                 source_url=source_url,
                 retryable=False,
                 review=True,
             )
-        match_field, match_value, match_mode = identity
-        params = self._query_params(match_field, match_value)
+        match_field, match_value, match_mode, value_type = identity
+        try:
+            soql_rhs = self._soql_equality_rhs(match_value, value_type)
+        except ValueError:
+            return self._error(
+                "invalid_identity_format",
+                source_url=source_url,
+                retryable=False,
+                review=True,
+            )
+        params = self._query_params(match_field, soql_rhs)
         headers = self._optional_token_headers()
         result = self._http.get(source_url, params=params, headers=headers)
         retrieved_at = self._now()
@@ -239,6 +278,7 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
             match_field=match_field,
             match_value=match_value,
             match_mode=match_mode,
+            value_type=value_type,
             retrieved_at=retrieved_at,
         )
 
@@ -251,18 +291,51 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
             return {}
         return {"X-App-Token": token}
 
-    def _identity(self, query: PropertyLookupQuery) -> tuple[str, str, str] | None:
+    def _identity(
+        self, query: PropertyLookupQuery
+    ) -> tuple[str, str, str, SocrataIdentityValueType] | None:
         parcel = (query.parcel_id or "").strip()
         account = (query.account_id or "").strip()
         if parcel:
-            return self._options.parcel_field, parcel, "exact_parcel"
+            return (
+                self._options.parcel_field,
+                parcel,
+                "exact_parcel",
+                self._options.parcel_value_type,
+            )
         if account and self._options.account_field:
-            return self._options.account_field, account, "exact_account"
+            return (
+                self._options.account_field,
+                account,
+                "exact_account",
+                self._options.account_value_type,
+            )
         return None
 
-    def _query_params(self, field: str, value: str) -> dict[str, str]:
+    def _blank_number_identity(self, query: PropertyLookupQuery) -> bool:
+        """True when a number-mode identifier was supplied but is empty after strip."""
+        parcel_raw = query.parcel_id
+        if parcel_raw is not None and not parcel_raw.strip():
+            return self._options.parcel_value_type is SocrataIdentityValueType.NUMBER
+        if (parcel_raw or "").strip():
+            return False
+        account_raw = query.account_id
+        if (
+            account_raw is not None
+            and not account_raw.strip()
+            and self._options.account_field
+        ):
+            return self._options.account_value_type is SocrataIdentityValueType.NUMBER
+        return False
+
+    def _soql_equality_rhs(self, value: str, value_type: SocrataIdentityValueType) -> str:
+        if value_type is SocrataIdentityValueType.NUMBER:
+            return soql_number_literal(value)
+        return soql_string_literal(value)
+
+    def _query_params(self, field: str, soql_rhs: str) -> dict[str, str]:
         params = {
-            "$where": f"{field} = {soql_string_literal(value)}",
+            "$where": f"{field} = {soql_rhs}",
             "$limit": str(self._options.query_limit),
         }
         select = self._select_clause()
@@ -297,6 +370,7 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
         match_field: str,
         match_value: str,
         match_mode: str,
+        value_type: SocrataIdentityValueType,
         retrieved_at: datetime,
     ) -> ProviderOutcome:
         mapped = self._map_transport_or_status(result, source_url=source_url)
@@ -304,7 +378,7 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
             return mapped
 
         try:
-            payload = json.loads(result.body.decode("utf-8"))
+            payload = json.loads(result.body.decode("utf-8"), parse_float=Decimal)
         except (UnicodeDecodeError, json.JSONDecodeError):
             return self._error(
                 "malformed_provider_response",
@@ -346,8 +420,24 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
                     http_status=result.status_code,
                     extra={"missing_fields": missing, "result_count": len(rows)},
                 )
+            if value_type is SocrataIdentityValueType.NUMBER and self._unusable_number_identity(
+                rows, match_field
+            ):
+                return self._error(
+                    "schema_mismatch",
+                    source_url=source_url,
+                    retryable=False,
+                    review=True,
+                    http_status=result.status_code,
+                    extra={"missing_fields": [match_field], "result_count": len(rows)},
+                )
 
-        matched = filter_identity_matches(rows, field=match_field, expected=match_value)
+        matched = filter_identity_matches(
+            rows,
+            field=match_field,
+            expected=match_value,
+            numeric=value_type is SocrataIdentityValueType.NUMBER,
+        )
         return self._match_outcome(
             matched,
             query=query,
@@ -514,6 +604,17 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
                     break
         return missing
 
+    def _unusable_number_identity(
+        self, rows: Sequence[Mapping[str, object]], field: str
+    ) -> bool:
+        for row in rows:
+            raw = row.get(field)
+            if raw is None:
+                continue
+            if parse_socrata_number_identity(raw) is None:
+                return True
+        return False
+
     def _match_outcome(
         self,
         matched: Sequence[Mapping[str, object]],
@@ -671,6 +772,9 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
             return None
         if isinstance(value, bool):
             return "true" if value else "false"
+        if isinstance(value, Decimal):
+            text = format(value, "f").strip()
+            return text or None
         if isinstance(value, int | float | str):
             text = str(value).strip()
             return text or None
@@ -750,4 +854,4 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
 
 
 def _is_scalar_or_none(value: object) -> bool:
-    return value is None or isinstance(value, bool | int | float | str)
+    return value is None or isinstance(value, bool | int | float | str | Decimal)

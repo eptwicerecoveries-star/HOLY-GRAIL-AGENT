@@ -105,6 +105,8 @@ def test_socrata_config_valid() -> None:
     assert parsed.domain == "opendata.example.gov"
     assert parsed.dataset_id == "abcd-1234"
     assert parsed.verified_for_automated_access is True
+    assert parsed.parcel_value_type.value == "text"
+    assert parsed.account_value_type.value == "text"
 
 
 def test_unknown_socrata_option_rejected() -> None:

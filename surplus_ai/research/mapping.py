@@ -6,6 +6,7 @@ import re
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 
+from surplus_ai.research.endpoint import parse_socrata_number_identity
 from surplus_ai.research.models import EvidenceAtom, ResearchMethod
 from surplus_ai.research.provenance import build_evidence_atom
 
@@ -34,7 +35,10 @@ def filter_identity_matches(
     *,
     field: str,
     expected: str,
+    numeric: bool = False,
 ) -> list[Mapping[str, object]]:
+    if numeric:
+        return _filter_numeric_identity_matches(rows, field=field, expected=expected)
     wanted = match_normalize(expected)
     matched: list[Mapping[str, object]] = []
     for row in rows:
@@ -42,6 +46,28 @@ def filter_identity_matches(
         if raw is None:
             continue
         if match_normalize(str(raw)) == wanted:
+            matched.append(row)
+    return matched
+
+
+def _filter_numeric_identity_matches(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    field: str,
+    expected: str,
+) -> list[Mapping[str, object]]:
+    wanted = parse_socrata_number_identity(expected)
+    if wanted is None:
+        return []
+    matched: list[Mapping[str, object]] = []
+    for row in rows:
+        raw = row.get(field)
+        if raw is None:
+            continue
+        parsed = parse_socrata_number_identity(raw)
+        if parsed is None:
+            continue
+        if parsed == wanted:
             matched.append(row)
     return matched
 

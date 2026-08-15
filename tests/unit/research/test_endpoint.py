@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from decimal import localcontext
+
 import pytest
 
 from surplus_ai.research.endpoint import (
     socrata_resource_url,
+    soql_number_literal,
     soql_string_literal,
     validate_public_https_url,
     validate_socrata_dataset_id,
@@ -97,3 +100,66 @@ def test_field_identifier_validation() -> None:
 
 def test_soql_string_literal_escapes_apostrophe() -> None:
     assert soql_string_literal("O'HARA") == "'O''HARA'"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("0", "0"),
+        ("0.0", "0"),
+        ("000", "0"),
+        ("000.000", "0"),
+        ("1", "1"),
+        ("10", "10"),
+        ("100", "100"),
+        ("1000", "1000"),
+        ("00100", "100"),
+        ("00123", "123"),
+        ("1000160100", "1000160100"),
+        ("123.0", "123"),
+        ("123.00", "123"),
+        ("123.40", "123.4"),
+        ("123.45", "123.45"),
+        ("123.4500", "123.45"),
+        ("0.10", "0.1"),
+        ("0.1000", "0.1"),
+        ("10.01", "10.01"),
+        ("100.01", "100.01"),
+    ],
+)
+def test_soql_number_literal_is_unquoted_and_canonical(value: str, expected: str) -> None:
+    literal = soql_number_literal(value)
+    assert literal == expected
+    assert "'" not in literal
+    assert "e" not in literal.lower()
+    assert literal != ""
+
+
+def test_soql_number_literal_preserves_integer_magnitude_under_low_precision() -> None:
+    with localcontext() as ctx:
+        ctx.prec = 6
+        assert soql_number_literal("1000160100") == "1000160100"
+        assert soql_number_literal("1000") == "1000"
+        assert soql_number_literal("100") == "100"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "1 OR 1=1",
+        "1e6",
+        "+123",
+        "-123",
+        "NaN",
+        "Infinity",
+        "0x10",
+        "1_000",
+        "12 34",
+        "123abc",
+        "",
+        "1;DROP",
+    ],
+)
+def test_soql_number_literal_rejects_unsafe_input(value: str) -> None:
+    with pytest.raises(ValueError):
+        soql_number_literal(value)
