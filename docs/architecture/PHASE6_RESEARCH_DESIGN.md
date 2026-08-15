@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → stop → approve 6D separately.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → stop → approve a real live dataset separately. ArcGIS and generic REST are later 6D increments.
 
 ## Phase 6A (implemented)
 
@@ -118,8 +118,26 @@ Human research review queue (`research_review_items`). Evidence/workflow only.
 - No backfill of 6A/6B rows. No Contact/Lead/Property/Compliance writes. No `AuditLog`.
 - CLI: `surplusai research review list|show|resolve`
 
+## Phase 6D Socrata / live-provider foundation (implemented; live validation pending)
+
+Offline foundation only. **No real government or open-data endpoint has been called or verified.**
+
+Shipped in this slice:
+
+- Sync `ResearchHttpClient` (`httpx`): HTTPS only, TLS verify on, GET only, redirects off, `trust_env=False`, bounded timeouts, User-Agent `SurplusAI-Research/0.1`, streaming 1 MiB cap, no client retries.
+- Endpoint/host policy: reject `http://`, `file://`, `ftp://`, `data:`, `javascript:`, localhost, loopback, private, link-local, and unspecified addresses. Destinations come only from validated provider YAML. Hostname checks are string-level before connect; they do **not** pin the resolved IP. DNS rebinding / private resolution after validation is a **pre-live blocker** — do not enable a real Socrata provider until resolved-IP enforcement (or equivalent) is implemented and reviewed.
+- `SocrataOpenDataProvider` builds `https://{domain}/resource/{dataset_id}.json` from structured config (`extra='forbid'`). No arbitrary request URL. Conservative SoQL identifier validation; runtime values escaped then passed as httpx query params.
+- `verified_for_automated_access` is an internal operational gate. Unverified providers remain listable; selecting them performs no HTTP (`error_code=automated_access_not_verified`). The shipped `example_socrata` provider is unverified. Default remains `manual_lookup`. No county YAML selects a live provider.
+- YAML stores credential **environment variable names** only. Optional Socrata app token is sent as `X-App-Token` when present; never persisted.
+- Matching is exact parcel/account only. Zero rows → `NOT_FOUND`. One exact match → `SUCCESS`. Multiple matches → `SUCCESS` with review required and `cacheable=True`. Owner-of-record text disagreement still keeps the parcel match and requires review.
+- Compact provenance only (`schema_version: 1` additive). Canonical `source_url` is the dataset endpoint with no query string.
+- Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
+- Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons.
+
+**Not in this slice:** ArcGIS, ConfigurableREST / generic REST, county-specific provider classes, a verified live dataset, opt-in live tests.
+
 ## Later phases (not started)
 
-- 6D+: live Socrata/ArcGIS/REST
+- 6D later increments: ArcGIS, generic REST, approved live dataset validation
 - 6E: local enrichment apply paths
 - 6F: skip-trace + Contact materialization when Lead exists

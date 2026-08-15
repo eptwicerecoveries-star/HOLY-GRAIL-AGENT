@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -444,3 +446,68 @@ def test_cli_exposes_no_cache_flag() -> None:
 
     assert "no_cache" in inspect.signature(research_case).parameters
     assert "no_cache" in inspect.signature(research_pending).parameters
+
+
+def _insert_result(
+    session: Session,
+    sample_case: SurplusCase,
+    *,
+    row_id: uuid.UUID,
+    fetched_at: datetime,
+    provider: str = "manual_lookup",
+) -> ResearchResult:
+    row = ResearchResult(
+        id=row_id,
+        surplus_case_id=sample_case.id,
+        provider=provider,
+        request_payload={"schema_version": 1, "cache_key": str(row_id)},
+        response_payload={
+            "schema_version": 1,
+            "found": False,
+            "requires_human_review": True,
+            "provider_status": "not_found",
+        },
+        status=ResearchStatus.NOT_FOUND,
+    )
+    session.add(row)
+    session.flush()
+    row.fetched_at = fetched_at
+    session.flush()
+    return row
+
+
+def test_latest_for_case_equal_fetched_at_uses_id_desc(
+    session: Session, sample_case: SurplusCase
+) -> None:
+    ts = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    low = uuid.UUID("00000000-0000-4000-8000-000000000001")
+    high = uuid.UUID("ffffffff-ffff-4fff-8000-000000000002")
+    _insert_result(session, sample_case, row_id=high, fetched_at=ts)
+    _insert_result(session, sample_case, row_id=low, fetched_at=ts)
+    latest = ResearchPipeline(session).latest_for_case(sample_case.id)
+    assert latest is not None
+    assert latest.id == high
+
+    for row in list(session.scalars(select(ResearchResult)).all()):
+        session.delete(row)
+    session.flush()
+    _insert_result(session, sample_case, row_id=low, fetched_at=ts)
+    _insert_result(session, sample_case, row_id=high, fetched_at=ts)
+    latest = ResearchPipeline(session).latest_for_case(sample_case.id)
+    assert latest is not None
+    assert latest.id == high
+
+
+def test_status_rows_equal_fetched_at_uses_id_desc(
+    session: Session, sample_case: SurplusCase
+) -> None:
+    ts = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    low = uuid.UUID("00000000-0000-4000-8000-000000000010")
+    high = uuid.UUID("ffffffff-ffff-4fff-8000-000000000020")
+    earlier = datetime(2026, 8, 14, 11, 0, tzinfo=UTC)
+    later_low = uuid.UUID("00000000-0000-4000-8000-000000000003")
+    _insert_result(session, sample_case, row_id=high, fetched_at=ts)
+    _insert_result(session, sample_case, row_id=low, fetched_at=ts)
+    _insert_result(session, sample_case, row_id=later_low, fetched_at=earlier)
+    rows = ResearchPipeline(session).status_rows(case_id=sample_case.id, limit=10)
+    assert [row.id for row in rows] == [high, low, later_low]

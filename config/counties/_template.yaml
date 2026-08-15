@@ -48,3 +48,9 @@ source_url: null
 publishing_frequency: irregular
 
 notes: ""
+
+# Optional Phase 6 research provider override. Default is manual_lookup from
+# config/research/providers.yaml. Do not point a county at a live Socrata
+# provider until that official dataset and access method are separately approved.
+# research:
+#   property_provider: manual_lookup

@@ -95,6 +95,7 @@ class PropertyLookupQuery(BaseModel):
     state: str
     county_slug: str
     parcel_id: str | None = None
+    account_id: str | None = None
     owner_raw_name: str | None = None
     property_address_raw: str | None = None
     sale_date: str | None = None

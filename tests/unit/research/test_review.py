@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -13,6 +15,7 @@ from surplus_ai.database.models.contact import Contact
 from surplus_ai.database.models.enums import (
     ResearchReviewReason,
     ResearchReviewResolution,
+    ResearchStatus,
     ReviewStatus,
     SurplusCaseStatus,
 )
@@ -247,6 +250,74 @@ def test_frozen_research_result_id_and_newer_warning(
     assert shown.newer.id != first.id
     session.refresh(shown.item)
     assert shown.item.research_result_id == first.id
+
+
+@pytest.mark.parametrize(
+    ("triggering_id", "sibling_id"),
+    [
+        (
+            uuid.UUID("ffffffff-ffff-4fff-8000-000000000001"),
+            uuid.UUID("00000000-0000-4000-8000-000000000002"),
+        ),
+        (
+            uuid.UUID("00000000-0000-4000-8000-000000000001"),
+            uuid.UUID("ffffffff-ffff-4fff-8000-000000000002"),
+        ),
+    ],
+)
+def test_equal_fetched_at_still_reports_newer_result(
+    session: Session,
+    sample_case: SurplusCase,
+    triggering_id: uuid.UUID,
+    sibling_id: uuid.UUID,
+) -> None:
+    """Same-or-later timestamp siblings are visible; UUID is a tie-break, not insert order."""
+    ts = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+    triggering = ResearchResult(
+        id=triggering_id,
+        surplus_case_id=sample_case.id,
+        provider="manual_lookup",
+        request_payload={"schema_version": 1, "cache_key": "t"},
+        response_payload={
+            "schema_version": 1,
+            "found": False,
+            "requires_human_review": True,
+            "provider_status": "not_found",
+        },
+        status=ResearchStatus.NOT_FOUND,
+    )
+    sibling = ResearchResult(
+        id=sibling_id,
+        surplus_case_id=sample_case.id,
+        provider="manual_lookup",
+        request_payload={"schema_version": 1, "cache_key": "s"},
+        response_payload={
+            "schema_version": 1,
+            "found": False,
+            "requires_human_review": True,
+            "provider_status": "not_found",
+        },
+        status=ResearchStatus.NOT_FOUND,
+    )
+    session.add_all([triggering, sibling])
+    session.flush()
+    triggering.fetched_at = ts
+    sibling.fetched_at = ts
+    session.flush()
+    item = ResearchReviewItem(
+        surplus_case_id=sample_case.id,
+        research_result_id=triggering.id,
+        provider="manual_lookup",
+        reason=ResearchReviewReason.MANUAL_RESEARCH_REQUIRED,
+        status=ReviewStatus.PENDING,
+    )
+    session.add(item)
+    session.flush()
+    shown = ResearchReviewQueue(session).show(item.id)
+    assert shown.item.research_result_id == triggering.id
+    assert shown.newer is not None
+    assert shown.newer.id == sibling_id
+    assert shown.newer.id != triggering.id
 
 
 def test_resolve_does_not_mutate_result_or_case_or_side_tables(

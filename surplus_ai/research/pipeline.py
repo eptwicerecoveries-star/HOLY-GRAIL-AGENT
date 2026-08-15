@@ -103,7 +103,7 @@ class ResearchPipeline:
         return self._session.scalar(
             select(ResearchResult)
             .where(ResearchResult.surplus_case_id == case_id)
-            .order_by(ResearchResult.fetched_at.desc())
+            .order_by(ResearchResult.fetched_at.desc(), ResearchResult.id.desc())
             .limit(1)
         )
 
@@ -121,7 +121,7 @@ class ResearchPipeline:
             select(ResearchResult)
             .join(SurplusCase, ResearchResult.surplus_case_id == SurplusCase.id)
             .join(County, SurplusCase.county_id == County.id)
-            .order_by(ResearchResult.fetched_at.desc())
+            .order_by(ResearchResult.fetched_at.desc(), ResearchResult.id.desc())
             .limit(limit)
         )
         if case_id is not None:

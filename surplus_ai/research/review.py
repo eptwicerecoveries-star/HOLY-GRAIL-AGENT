@@ -32,7 +32,14 @@ _SAFE_TOKEN = re.compile(r"^[a-z0-9_]+$")
 _COMPLEX_OWNER_TYPES = frozenset({"estate", "trust", "company", "government", "unknown"})
 _IDENTITY_FIELDS = frozenset({"owner_name_on_record", "mailing_address", "current_address"})
 _UNAVAILABLE_ERROR_CODES = frozenset(
-    {"credentials_missing", "provider_not_configured", "provider_not_implemented"}
+    {
+        "credentials_missing",
+        "provider_not_configured",
+        "provider_not_implemented",
+        "automated_access_not_verified",
+        "http_401",
+        "http_403",
+    }
 )
 _FAILURE_PROVIDER_STATUSES = frozenset({"error", "timeout", "rate_limited"})
 _RESOLVE_RESOLUTIONS = frozenset(
@@ -340,16 +347,24 @@ class ResearchReviewQueue:
     def _newer_result(
         self, item: ResearchReviewItem, triggering: ResearchResult
     ) -> ResearchResult | None:
-        latest = self._session.scalar(
+        """Return the newest deterministic sibling at or after the triggering timestamp.
+
+        ``fetched_at`` uses PostgreSQL ``now()`` (transaction timestamp), so two
+        appends in one transaction can share a timestamp. ``id`` is a random UUID
+        and is not insertion order. A distinct sibling with
+        ``fetched_at >= triggering.fetched_at`` is selected by
+        ``ORDER BY fetched_at DESC, id DESC``. The frozen ``research_result_id``
+        is never retargeted.
+        """
+        return self._session.scalar(
             select(ResearchResult)
             .where(ResearchResult.surplus_case_id == item.surplus_case_id)
             .where(ResearchResult.provider == item.provider)
+            .where(ResearchResult.id != triggering.id)
+            .where(ResearchResult.fetched_at >= triggering.fetched_at)
             .order_by(ResearchResult.fetched_at.desc(), ResearchResult.id.desc())
             .limit(1)
         )
-        if latest is None or latest.id == triggering.id:
-            return None
-        return latest
 
     def _filter_stmt(
         self,

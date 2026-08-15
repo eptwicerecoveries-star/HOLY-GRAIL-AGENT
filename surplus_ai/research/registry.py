@@ -13,9 +13,10 @@ from typing import Any, Literal
 
 import structlog
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from surplus_ai.research.exceptions import ProviderNotFoundError, ResearchConfigError
+from surplus_ai.research.http import HttpGetter
 from surplus_ai.research.policy import (
     ReliabilityPolicy,
     ReliabilityPolicyPatch,
@@ -25,6 +26,7 @@ from surplus_ai.research.providers.base import AbstractPropertyRecordProvider
 from surplus_ai.research.providers.credentials_missing import CredentialsMissingProvider
 from surplus_ai.research.providers.manual import ManualLookupProvider
 from surplus_ai.research.providers.null import NullProvider
+from surplus_ai.research.providers.socrata import SocrataOpenDataProvider, SocrataProviderOptions
 
 logger = structlog.get_logger(__name__)
 
@@ -32,7 +34,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROVIDERS_PATH = PROJECT_ROOT / "config" / "research" / "providers.yaml"
 COUNTIES_CONFIG_DIR = PROJECT_ROOT / "config" / "counties"
 
-ProviderTypeName = Literal["manual", "null", "credentials_required"]
+ProviderTypeName = Literal["manual", "null", "credentials_required", "socrata"]
 
 
 class ProviderSpec(BaseModel):
@@ -42,6 +44,16 @@ class ProviderSpec(BaseModel):
     description: str = ""
     requires_credential: str | None = None
     reliability: ReliabilityPolicyPatch | None = None
+    options: SocrataProviderOptions | None = None
+
+    @model_validator(mode="after")
+    def _options_match_type(self) -> ProviderSpec:
+        if self.type == "socrata":
+            if self.options is None:
+                raise ValueError("socrata providers require options")
+        elif self.options is not None:
+            raise ValueError("options is only valid for type socrata")
+        return self
 
 
 class ProvidersFile(BaseModel):
@@ -63,7 +75,7 @@ class ProvidersFile(BaseModel):
 class CountyResearchConfig(BaseModel):
     """Optional research block from config/counties/<state>/<slug>.yaml."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     property_provider: str | None = None
 
@@ -76,9 +88,11 @@ class ProviderRegistry:
         config_path: Path | None = None,
         *,
         counties_dir: Path | None = None,
+        http_client: HttpGetter | None = None,
     ) -> None:
         self._config_path = config_path or DEFAULT_PROVIDERS_PATH
         self._counties_dir = counties_dir or COUNTIES_CONFIG_DIR
+        self._http_client = http_client
         self._file = self._load_file(self._config_path)
         self._custom: dict[str, AbstractPropertyRecordProvider] = {}
 
@@ -175,6 +189,14 @@ class ProviderRegistry:
         if spec.type == "credentials_required":
             env_var = spec.requires_credential or "SURPLUS_AI_RESEARCH_API_KEY"
             return CredentialsMissingProvider(name=name, env_var=env_var)
+        if spec.type == "socrata":
+            if spec.options is None:
+                raise ResearchConfigError(f"Socrata provider {name!r} is missing options")
+            return SocrataOpenDataProvider(
+                name=name,
+                options=spec.options,
+                http=self._http_client,
+            )
         raise ResearchConfigError(f"Unsupported provider type {spec.type!r} for {name!r}")
 
     @staticmethod
