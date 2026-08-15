@@ -50,6 +50,10 @@ _ERROR_DETAIL = {
     "timeout": "The provider request timed out.",
     "network_failure": "The provider connection failed.",
     "tls_failure": "TLS certificate validation failed. The request was not retried.",
+    "dns_resolution_failed": "The provider hostname could not be resolved.",
+    "unsafe_resolved_address": (
+        "The provider hostname resolved to a disallowed destination. The request was not sent."
+    ),
     "unsafe_url": "The request URL was rejected by the HTTPS/host policy.",
     "http_redirect": "The provider returned a redirect. Redirects are not followed.",
     "response_too_large": "The provider response exceeded the maximum allowed size.",
@@ -388,6 +392,20 @@ class SocrataOpenDataProvider(AbstractPropertyRecordProvider):
                 "network_failure",
                 source_url=source_url,
                 retryable=result.retryable,
+                review=True,
+            )
+        if code == "dns_resolution_failed":
+            return self._error(
+                "dns_resolution_failed",
+                source_url=source_url,
+                retryable=True,
+                review=True,
+            )
+        if code == "unsafe_resolved_address":
+            return self._error(
+                "unsafe_resolved_address",
+                source_url=source_url,
+                retryable=False,
                 review=True,
             )
         if code == "unsafe_url":

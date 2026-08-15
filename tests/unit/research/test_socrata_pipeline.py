@@ -285,6 +285,67 @@ def test_http_401_is_provider_unavailable(
     )
 
 
+def test_unsafe_resolved_address_is_provider_unavailable(
+    session: Session, sample_case: SurplusCase, tmp_path: Any
+) -> None:
+    http = RecordingHttp(HttpGetResult(error_code="unsafe_resolved_address", retryable=False))
+    clock = FakeClock()
+    pipeline = _pipeline(session, tmp_path, http, clock=clock, use_cache=False)
+    row = pipeline.research_case(sample_case.id)
+    assert len(http.calls) == 1
+    assert clock.sleeps == []
+    assert row.response_payload["error_code"] == "unsafe_resolved_address"
+    dumped = str(row.response_payload)
+    assert "10.0.0.1" not in dumped
+    assert "8.8.8.8" not in dumped
+    item = session.scalar(select(ResearchReviewItem))
+    assert item is not None
+    assert item.reason is ResearchReviewReason.PROVIDER_UNAVAILABLE
+    assert classify_review_reason(row, provider_type="socrata") is (
+        ResearchReviewReason.PROVIDER_UNAVAILABLE
+    )
+
+
+def test_dns_resolution_failed_retries_as_provider_failure(
+    session: Session, sample_case: SurplusCase, tmp_path: Any
+) -> None:
+    http = RecordingHttp(
+        HttpGetResult(error_code="dns_resolution_failed", retryable=True),
+        http_json([]),
+    )
+    clock = FakeClock()
+    pipeline = _pipeline(session, tmp_path, http, clock=clock, use_cache=False)
+    row = pipeline.research_case(sample_case.id)
+    assert len(http.calls) == 2
+    assert clock.sleeps == [0.5]
+    assert row.response_payload["provider_status"] == "not_found"
+
+
+def test_dns_resolution_failed_maps_to_provider_failure(
+    session: Session, sample_case: SurplusCase, tmp_path: Any
+) -> None:
+    http = RecordingHttp(HttpGetResult(error_code="dns_resolution_failed", retryable=True))
+    pipeline = _pipeline(
+        session,
+        tmp_path,
+        http,
+        use_cache=False,
+        reliability={
+            "cache": {"ttl_seconds": 0},
+            "retry": {"max_attempts": 1, "backoff_seconds": 0},
+            "rate_limit": {"per_second": 0},
+        },
+    )
+    row = pipeline.research_case(sample_case.id)
+    item = session.scalar(select(ResearchReviewItem))
+    assert item is not None
+    assert item.reason is ResearchReviewReason.PROVIDER_FAILURE
+    assert row.response_payload["error_code"] == "dns_resolution_failed"
+    assert classify_review_reason(row, provider_type="socrata") is (
+        ResearchReviewReason.PROVIDER_FAILURE
+    )
+
+
 def test_required_credential_missing_no_http(
     session: Session,
     sample_case: SurplusCase,

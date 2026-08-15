@@ -35,6 +35,8 @@ def test_https_public_hostname_accepted() -> None:
         "https://169.254.1.1/resource/abcd-1234.json",
         "https://[fe80::1]/resource/abcd-1234.json",
         "https://0.0.0.0/resource/abcd-1234.json",
+        "https://100.64.0.1/resource/abcd-1234.json",
+        "https://224.0.0.1/resource/abcd-1234.json",
     ],
 )
 def test_blocked_urls_rejected(url: str) -> None:
@@ -51,6 +53,7 @@ def test_blocked_urls_rejected(url: str) -> None:
         "10.1.2.3",
         "192.168.0.9",
         "169.254.10.20",
+        "100.64.0.1",
         "fc00::1",
         "http://opendata.example.gov",
         "opendata.example.gov/resource",

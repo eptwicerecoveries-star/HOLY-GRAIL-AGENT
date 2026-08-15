@@ -39,6 +39,7 @@ _UNAVAILABLE_ERROR_CODES = frozenset(
         "automated_access_not_verified",
         "http_401",
         "http_403",
+        "unsafe_resolved_address",
     }
 )
 _FAILURE_PROVIDER_STATUSES = frozenset({"error", "timeout", "rate_limited"})

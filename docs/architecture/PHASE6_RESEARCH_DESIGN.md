@@ -124,15 +124,16 @@ Offline foundation only. **No real government or open-data endpoint has been cal
 
 Shipped in this slice:
 
-- Sync `ResearchHttpClient` (`httpx`): HTTPS only, TLS verify on, GET only, redirects off, `trust_env=False`, bounded timeouts, User-Agent `SurplusAI-Research/0.1`, streaming 1 MiB cap, no client retries.
-- Endpoint/host policy: reject `http://`, `file://`, `ftp://`, `data:`, `javascript:`, localhost, loopback, private, link-local, and unspecified addresses. Destinations come only from validated provider YAML. Hostname checks are string-level before connect; they do **not** pin the resolved IP. DNS rebinding / private resolution after validation is a **pre-live blocker** — do not enable a real Socrata provider until resolved-IP enforcement (or equivalent) is implemented and reviewed.
+- Sync `ResearchHttpClient` (`httpx` + explicit `httpcore`): HTTPS only, TLS verify on, GET only, redirects off, `trust_env=False` including the transport SSL context, bounded timeouts, User-Agent `SurplusAI-Research/0.1`, streaming 1 MiB cap, no client retries, HTTP/2 off, keepalive off.
+- Endpoint/host policy: reject `http://`, `file://`, `ftp://`, `data:`, `javascript:`, localhost, loopback, private, link-local, unspecified, multicast, CGNAT, and other non-global destinations. Destinations come only from validated provider YAML.
+- Pinned DNS/SSRF enforcement: each HTTP attempt resolves the configured hostname, fail-closes if any address is unsafe, then TCP-connects only to validated numeric addresses. TLS certificate checks, SNI, and the HTTP Host header remain the original hostname. Automated tests are offline and do not call public DNS. This does not claim to eliminate every conceivable DNS/network attack.
 - `SocrataOpenDataProvider` builds `https://{domain}/resource/{dataset_id}.json` from structured config (`extra='forbid'`). No arbitrary request URL. Conservative SoQL identifier validation; runtime values escaped then passed as httpx query params.
 - `verified_for_automated_access` is an internal operational gate. Unverified providers remain listable; selecting them performs no HTTP (`error_code=automated_access_not_verified`). The shipped `example_socrata` provider is unverified. Default remains `manual_lookup`. No county YAML selects a live provider.
 - YAML stores credential **environment variable names** only. Optional Socrata app token is sent as `X-App-Token` when present; never persisted.
 - Matching is exact parcel/account only. Zero rows → `NOT_FOUND`. One exact match → `SUCCESS`. Multiple matches → `SUCCESS` with review required and `cacheable=True`. Owner-of-record text disagreement still keeps the parcel match and requires review.
 - Compact provenance only (`schema_version: 1` additive). Canonical `source_url` is the dataset endpoint with no query string.
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
-- Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons.
+- Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
 **Not in this slice:** ArcGIS, ConfigurableREST / generic REST, county-specific provider classes, a verified live dataset, opt-in live tests.
 

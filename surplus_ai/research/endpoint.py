@@ -6,6 +6,7 @@ import ipaddress
 import re
 from urllib.parse import urlsplit
 
+from surplus_ai.research.dns import destination_is_unsafe
 from surplus_ai.research.exceptions import ResearchConfigError
 
 _HOSTNAME = re.compile(
@@ -46,14 +47,7 @@ def _reject_blocked_host(host: str) -> None:
 
 
 def _reject_blocked_ip(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
-    if (
-        address.is_loopback
-        or address.is_private
-        or address.is_link_local
-        or address.is_unspecified
-        or address.is_multicast
-        or address.is_reserved
-    ):
+    if destination_is_unsafe(address):
         raise ResearchConfigError(
             "Host must not be a loopback, private, link-local, or unspecified address"
         )

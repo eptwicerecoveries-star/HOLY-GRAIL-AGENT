@@ -391,6 +391,18 @@ def test_missing_configured_field_is_schema_mismatch() -> None:
             False,
         ),
         (
+            HttpGetResult(error_code="dns_resolution_failed", retryable=True),
+            ProviderOutcomeStatus.ERROR,
+            "dns_resolution_failed",
+            True,
+        ),
+        (
+            HttpGetResult(error_code="unsafe_resolved_address", retryable=False),
+            ProviderOutcomeStatus.ERROR,
+            "unsafe_resolved_address",
+            False,
+        ),
+        (
             HttpGetResult(status_code=302, error_code="http_redirect", retryable=False),
             ProviderOutcomeStatus.ERROR,
             "http_redirect",
