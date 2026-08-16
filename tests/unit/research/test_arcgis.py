@@ -316,17 +316,18 @@ def test_no_county_selects_arcgis() -> None:
     assert selected == []
 
 
-def test_no_official_arcgis_provider_configured() -> None:
+def test_shipped_arcgis_providers_remain_unverified() -> None:
     registry = ProviderRegistry()
     arcgis_names = [
         row["name"] for row in registry.describe() if row["type"] == "arcgis"
     ]
-    assert arcgis_names == ["example_arcgis"]
+    assert set(arcgis_names) == {"example_arcgis", "franklin_county_oh_auditor_parcels"}
     for row in registry.describe():
         if row["type"] == "arcgis":
             provider = registry.resolve(row["name"])
             assert isinstance(provider, ArcGISFeatureServerProvider)
             assert provider._options.verified_for_automated_access is False
+            assert provider._options.access_reviewed_on is None
 
 
 def test_socrata_yaml_still_rejects_unknown_keys(tmp_path: Path) -> None:

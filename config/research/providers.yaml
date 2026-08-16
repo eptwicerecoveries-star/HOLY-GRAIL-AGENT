@@ -6,7 +6,8 @@
 # dataset is separately approved. verified_for_automated_access is an internal operational
 # gate only; it is not legal permission to automate access. nyc_dcp_pluto is a disabled
 # candidate only: listable, unverified, and not selected by any county. example_arcgis is
-# a disabled fake FeatureServer shape only; no official ArcGIS dataset is configured.
+# a disabled fake FeatureServer shape only. franklin_county_oh_auditor_parcels is a
+# disabled official ArcGIS candidate: listable, unverified, and not selected by any county.
 # Omitted `reliability` on a custom config file keeps conservative defaults
 # (cache TTL 0, max_attempts 1, unlimited rate limit).
 
@@ -119,4 +120,38 @@ providers:
         - OBJECTID
       query_limit: 5
       source_organization: Example County GIS
+      verified_for_automated_access: false
+
+  # Franklin County Auditor Tax Parcel FeatureServer. Official Phase 6D ArcGIS
+  # candidate. Not approved for automated access. Do not point a county at this
+  # provider. Do not treat this as live validation.
+  franklin_county_oh_auditor_parcels:
+    type: arcgis
+    description: >-
+      Franklin County Auditor Tax Parcel ArcGIS FeatureServer.
+      Official Phase 6D ArcGIS validation candidate; not yet approved for automated access.
+    reliability:
+      cache:
+        ttl_seconds: 0
+      retry:
+        max_attempts: 1
+        backoff_seconds: 0
+      rate_limit:
+        per_second: 1
+    options:
+      domain: gis.franklincountyohio.gov
+      service_path: /hosting/rest/services/ParcelFeatures/Parcel_Features/FeatureServer
+      layer_id: 0
+      parcel_field: PARCELID
+      parcel_value_type: text
+      owner_field: OWNERNME1
+      situs_address_field: SITEADDRESS
+      record_id_field: OBJECTID
+      select_fields:
+        - PARCELID
+        - OWNERNME1
+        - SITEADDRESS
+        - OBJECTID
+      query_limit: 5
+      source_organization: Franklin County Auditor
       verified_for_automated_access: false

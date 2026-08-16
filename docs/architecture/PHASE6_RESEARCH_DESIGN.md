@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (not live-validated) → stop. Official ArcGIS candidate config is 6D-ArcGIS-B. Generic REST remains after ArcGIS. Production county activation is a separate human decision.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed; not live-validated) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated) → stop. A later controlled ArcGIS live request is 6D-ArcGIS-C and is **not authorized** here. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -142,7 +142,7 @@ Shipped in this slice:
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
 - Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
-**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below; no official ArcGIS candidate is configured.
+**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below. Official Franklin County candidate config is in 6D-ArcGIS-B below and remains disabled.
 
 ### Controlled NYC PLUTO live validation (2026-08-15)
 
@@ -173,7 +173,7 @@ No additional live request is authorized.
 
 ## Phase 6D-ArcGIS-A generic offline FeatureServer foundation (implemented; not live-validated)
 
-A county-agnostic ArcGIS FeatureServer adapter is implemented. All ArcGIS tests are offline/mocked. No live ArcGIS HTTP request occurred. No official ArcGIS dataset is configured. This is not live validation and not production enablement.
+A county-agnostic ArcGIS FeatureServer adapter is implemented. All ArcGIS tests are offline/mocked. No live ArcGIS HTTP request occurred. At completion of 6D-ArcGIS-A, no official ArcGIS dataset was configured. 6D-ArcGIS-B adds Franklin County Auditor as a disabled official validation candidate. This is not live validation and not production enablement. The Franklin provider is not enabled.
 
 Shipped in this increment:
 
@@ -188,11 +188,110 @@ Shipped in this increment:
 
 **Not in this increment:** official ArcGIS candidate configuration, Franklin County, Lake County, Shasta County, credentials/tokens, MapServer fallback, generic REST, live ArcGIS requests, 6E/6F.
 
-Franklin County remains a candidate for **6D-ArcGIS-B** only.
+## Phase 6D-ArcGIS-B disabled official Franklin County candidate (config only; not live-validated)
+
+6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). 6D-ArcGIS-C is **not authorized** and is not live-validated. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are not started.
+
+This increment does **not** claim legal permission to automate, commercial-use approval, production access, proven anonymous `/query`, or proven token-free operation.
+
+### Official layer metadata
+
+The following field types and lengths were verified from the official Franklin County ArcGIS layer metadata. They are documentation only; they are not stored in `providers.yaml`.
+
+| Field | Esri type | Length |
+|-------|-----------|--------|
+| `PARCELID` | `esriFieldTypeString` | 11 |
+| `OWNERNME1` | `esriFieldTypeString` | 250 |
+| `SITEADDRESS` | `esriFieldTypeString` | 70 |
+| `OBJECTID` | `esriFieldTypeOID` | (object ID; no string length) |
+
+Layer 0 identity **Tax Parcel**: **VERIFIED**.
+
+Shipped config maps the minimum fields only: `PARCELID` (`parcel_value_type: text`), `OWNERNME1`, `SITEADDRESS`, `OBJECTID`. No mailing fields, no `account_field`, no geometry, no token, no county pointer.
+
+### Parcel-id representation caveat
+
+Official published parcel identifier: `010-016668-00`.
+
+Official source: Franklin County Auditor Weekly Commercial Sales Report dated June 14, 2026.
+
+- It is a real parcel identifier published by the Franklin County Auditor.
+- The published representation is hyphenated: `010-016668-00`.
+- The ArcGIS `PARCELID` field is `esriFieldTypeString` length 11.
+- The published hyphenated string contains 13 characters.
+- The exact representation stored in the ArcGIS `PARCELID` field is **NOT VERIFIED**.
+- `01001666800` is only a plausible 11-character representation, **not** a verified transformation.
+- No automatic de-hyphenation rule has been approved.
+- No code performs that rewrite.
+- No FeatureServer `/query` has tested either representation.
+- ArcGIS-C must separately approve the exact **one** lookup string before any live request.
+- If the approved live lookup later returns `NOT_FOUND`, there must be no automatic second representation attempt.
+- `010-016668-00` is **not** the definite final ArcGIS-C request value.
+
+### Terms / access classifications
+
+| Item | Classification |
+|------|----------------|
+| Official government ownership | **VERIFIED** |
+| Public catalog/service listing | **VERIFIED** |
+| FeatureServer availability | **VERIFIED** |
+| Layer 0 Tax Parcel identity | **VERIFIED** |
+| Anonymous `/query` access | **NOT VERIFIED** |
+| Authentication/token requirement for `/query` | **NOT VERIFIED** |
+| Commercial-use permission | **NOT EXPLICITLY ADDRESSED / REQUIRES HUMAN JUDGMENT** |
+| Attribution | **REQUIRES HUMAN JUDGMENT** |
+| Client request-rate policy | **NOT EXPLICITLY ADDRESSED** |
+| Dataset-specific API automation permission | **NOT EXPLICITLY ADDRESSED** |
+| Owner-name business/privacy use | **REQUIRES HUMAN JUDGMENT** |
+| Explicit prohibition against ordinary low-rate API access | **NONE FOUND IN REVIEWED OFFICIAL SOURCES**, but silence is not permission |
+
+Do **not** claim: legal to automate; commercial use approved; production access approved; anonymous data queries proven; token-free operation proven.
+
+`verified_for_automated_access: false` is an internal operational gate only. It is not legal permission.
+
+### Owner-data boundary
+
+`OWNERNME1` is technically available as published property-record evidence.
+
+That does **not** mean Contact may be created, Lead may be created, outreach is authorized, Compliance is satisfied, skip tracing is authorized, or entitlement is established.
+
+Research remains **evidence only**. Business/privacy use of owner names remains a separate human judgment.
+
+### Static endpoint review (not called)
+
+Statically expected future query endpoint:
+
+`https://gis.franklincountyohio.gov/hosting/rest/services/ParcelFeatures/Parcel_Features/FeatureServer/0/query`
+
+Canonical source URL:
+
+`https://gis.franklincountyohio.gov/hosting/rest/services/ParcelFeatures/Parcel_Features/FeatureServer/0`
+
+- HTTPS
+- FeatureServer
+- explicit layer 0
+- no credential embedded
+- canonical source URL contains no query string
+- production DNS/SSRF was not run
+- `/query` was not called
+
+**REDIRECT BEHAVIOR: NOT VERIFIED**
+
+### Operational gate
+
+- `verified_for_automated_access: false`
+- No `access_reviewed_on`
+- Conservative reliability override (`ttl_seconds: 0`, `max_attempts: 1`, `backoff_seconds: 0`, `per_second: 1`, `query_limit: 5`)
+- Default remains `manual_lookup`
+- `example_arcgis` and `nyc_dcp_pluto` remain disabled
+- No county selects the Franklin provider
+- Offline config tests prove registry listing and that unverified lookup fails before HTTP (`automated_access_not_verified`)
+
+**Not in this increment:** live ArcGIS query, `verified_for_automated_access: true`, county activation, tokens, MapServer, generic REST, 6E/6F.
 
 ## Later phases (not started)
 
-- 6D-ArcGIS-B: official ArcGIS candidate config + terms review (no live query until separately authorized)
-- 6D later increment: generic REST
-- 6E: local enrichment apply paths
-- 6F: skip-trace + Contact materialization when Lead exists
+- 6D-ArcGIS-C: **NOT authorized**; not live-validated yet; one separately authorized controlled live FeatureServer lookup (not executed here)
+- 6D later increment: generic REST (after ArcGIS)
+- 6E: local enrichment apply paths (**not started**)
+- 6F: skip-trace + Contact materialization when Lead exists (**not started**)
