@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed; not live-validated) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated) → stop. A later controlled ArcGIS live request is 6D-ArcGIS-C and is **not authorized** here. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed; not live-validated) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; ArcGIS-C live validation blocked by unresolved `PARCELID` identity) → 6D-ArcGIS-C preparation disabled Lake County candidate config (not live-validated) → stop. A later controlled ArcGIS live request is 6D-ArcGIS-C and is **not authorized** here. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -142,7 +142,7 @@ Shipped in this slice:
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
 - Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
-**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below. Official Franklin County candidate config is in 6D-ArcGIS-B below and remains disabled.
+**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below. Official Franklin County candidate config is in 6D-ArcGIS-B below and remains disabled. Official Lake County candidate config is in the 6D-ArcGIS-C preparation section below and remains disabled.
 
 ### Controlled NYC PLUTO live validation (2026-08-15)
 
@@ -190,7 +190,7 @@ Shipped in this increment:
 
 ## Phase 6D-ArcGIS-B disabled official Franklin County candidate (config only; not live-validated)
 
-6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). 6D-ArcGIS-C is **not authorized** and is not live-validated. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are not started.
+6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). Franklin is **not** the ArcGIS-C live-validation candidate: exact Tax Parcel `PARCELID` representation remains unresolved. 6D-ArcGIS-C live request is **not authorized** and is not live-validated. Phase 6D is still **in progress**. Generic REST remains after ArcGIS. Phase 6E and Phase 6F are not started.
 
 This increment does **not** claim legal permission to automate, commercial-use approval, production access, proven anonymous `/query`, or proven token-free operation.
 
@@ -289,9 +289,100 @@ Canonical source URL:
 
 **Not in this increment:** live ArcGIS query, `verified_for_automated_access: true`, county activation, tokens, MapServer, generic REST, 6E/6F.
 
+## Phase 6D-ArcGIS-C preparation (disabled Lake County candidate; not live-validated)
+
+Franklin County remains a valid disabled official candidate. It is **not** used for ArcGIS-C live validation because exact Tax Parcel `PARCELID` identity mapping is unresolved.
+
+Lake County, Florida is the selected **disabled** ArcGIS-C preparation candidate because official Property Appraiser / GIS pages supply substantially stronger `AltKey` identity evidence. `lake_county_fl_pa_tax_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no token; no county pointer). This is configuration and offline tests only. **No live Lake `/query` has occurred.** Anonymous `/query` and token behavior remain **NOT VERIFIED**. 6D-ArcGIS-C live request is **not authorized**.
+
+Intended text identity field: `AltKey` (`parcel_value_type: text`). `ParcelNumber` is not selected and is not the lookup identity.
+
+Shipped config maps the minimum fields only: `AltKey`, `OwnerName`, `PropertyAddress`, `OBJECTID`. No mailing fields, no `account_field`, no geometry, no `ParcelNumber`, no token, no county pointer.
+
+### Official layer metadata
+
+Verified from the official Lake County Tax Parcels FeatureServer layer page (documentation only; types/lengths are not stored in `providers.yaml`):
+
+| Field | Esri type | Length / notes |
+|-------|-----------|----------------|
+| `AltKey` | `esriFieldTypeString` | 7; Display Field: `AltKey` |
+| `OwnerName` | `esriFieldTypeString` | 100 |
+| `PropertyAddress` | `esriFieldTypeString` | 100 |
+| `OBJECTID` | `esriFieldTypeOID` | (object ID; no string length) |
+
+Layer 12 identity **Tax Parcels**: **VERIFIED**. Advertised capabilities include **Query**.
+
+### Exact AltKey evidence (not a live-query proof)
+
+Official Property Appraiser record: `https://lakecopropappr.com/property-details.aspx?AltKey=2866713`
+
+- Alternate Key: `2866713`
+- Official GIS map link on the same card: `https://gis.lakecountyfl.gov/gisweb/?query=2866713`
+- Lake County Connect exposes **AltKey** as an explicit search type (Search Help also lists Alternate Key)
+
+Classification: `2866713` = **EXACT ARCGIS QUERY IDENTIFIER EVIDENCE FOR `AltKey`**. This does **not** prove a future `/query` will succeed. Do not use `ParcelNumber` as the lookup identity.
+
+**NO LOWER-PII TEST RECORD SELECTED.** `2866713` remains a technically verified identifier example for human consideration only. It is **not** authorized here as a live-test value. The known record is residential / natural-person ownership.
+
+### Terms / access classifications
+
+Official source: Lake County Property Appraiser [Site Notice](https://www.lakecopropappr.com/site-notice.aspx). The system is offered as a public service for review/retrieval of publicly available government information. Users must comply with applicable law. Automated scripts/programs that scrape the site **and** result in blocking or slowing access are described as unauthorized. Property/GIS data is for ad valorem assessment / informational purposes and may not be compatible with other uses. No warranties are provided. Public-record/privacy principles apply.
+
+| Item | Classification |
+|------|----------------|
+| Official government source | **VERIFIED** |
+| Public FeatureServer / GeoHub listing | **VERIFIED** |
+| Anonymous `/query` | **NOT VERIFIED** |
+| Token requirement | **NOT VERIFIED** |
+| One low-rate API validation specifically prohibited | **NOT EXPLICITLY ESTABLISHED** |
+| Broad scraping that blocks/slows service | **EXPLICITLY DISALLOWED** |
+| Commercial/business use | **REQUIRES HUMAN JUDGMENT** |
+| Attribution | **REQUIRES HUMAN JUDGMENT / NOT EXPLICITLY ADDRESSED** as a license condition |
+| Owner-name use | **BUSINESS / PRIVACY HUMAN JUDGMENT** |
+
+Do **not** claim: legal to automate; commercial use approved; bulk collection approved; production use approved.
+
+`verified_for_automated_access: false` is an internal operational gate only. It is not legal permission.
+
+### WAF / network
+
+Official Tax Parcels layer metadata is publicly listed and was visible in a local browser. Some cloud-origin fetches of the same metadata URL were WAF-blocked. Local production-network behavior for `/query` is **NOT VERIFIED**. WAF may block a later request. If the eventual single request is blocked: **STOP**. No bypass, no alternate IP/host, no browser emulation, no token workaround, no second request.
+
+### Static endpoint review (not called)
+
+Statically expected future query endpoint:
+
+`https://gis.lakecountyfl.gov/lakegis/rest/services/OpenData/OpenData1/FeatureServer/12/query`
+
+Canonical source URL:
+
+`https://gis.lakecountyfl.gov/lakegis/rest/services/OpenData/OpenData1/FeatureServer/12`
+
+- HTTPS
+- FeatureServer
+- explicit layer 12
+- no credential embedded
+- canonical source URL contains no query string
+- production DNS/SSRF was not run against `/query`
+- `/query` was not called
+
+**REDIRECT BEHAVIOR: NOT VERIFIED**
+
+### Operational gate
+
+- `verified_for_automated_access: false`
+- No `access_reviewed_on`
+- Conservative reliability override (`ttl_seconds: 0`, `max_attempts: 1`, `backoff_seconds: 0`, `per_second: 1`, `query_limit: 5`)
+- Default remains `manual_lookup`
+- Franklin, `example_arcgis`, and `nyc_dcp_pluto` remain disabled
+- No county selects the Lake provider
+- Offline config tests prove registry listing and that unverified lookup fails before HTTP (`automated_access_not_verified`)
+
+**Not in this increment:** live ArcGIS query, `verified_for_automated_access: true`, county activation, tokens, MapServer, generic REST, 6E/6F.
+
 ## Later phases (not started)
 
-- 6D-ArcGIS-C: **NOT authorized**; not live-validated yet; one separately authorized controlled live FeatureServer lookup (not executed here)
+- 6D-ArcGIS-C: **NOT authorized**; not live-validated; one separately authorized controlled live FeatureServer lookup (not executed here). Disabled Lake County preparation config is present.
 - 6D later increment: generic REST (after ArcGIS)
 - 6E: local enrichment apply paths (**not started**)
 - 6F: skip-trace + Contact materialization when Lead exists (**not started**)

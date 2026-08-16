@@ -8,6 +8,8 @@
 # candidate only: listable, unverified, and not selected by any county. example_arcgis is
 # a disabled fake FeatureServer shape only. franklin_county_oh_auditor_parcels is a
 # disabled official ArcGIS candidate: listable, unverified, and not selected by any county.
+# lake_county_fl_pa_tax_parcels is the selected disabled ArcGIS-C preparation candidate:
+# listable, unverified, and not selected by any county. It is not live-validated.
 # Omitted `reliability` on a custom config file keeps conservative defaults
 # (cache TTL 0, max_attempts 1, unlimited rate limit).
 
@@ -154,4 +156,38 @@ providers:
         - OBJECTID
       query_limit: 5
       source_organization: Franklin County Auditor
+      verified_for_automated_access: false
+
+  # Lake County Property Appraiser Tax Parcels FeatureServer. Selected disabled
+  # Phase 6D ArcGIS-C preparation candidate. Not approved for automated access.
+  # Do not point a county at this provider. Do not treat this as live validation.
+  lake_county_fl_pa_tax_parcels:
+    type: arcgis
+    description: >-
+      Lake County Property Appraiser Tax Parcels ArcGIS FeatureServer.
+      Official Phase 6D ArcGIS validation candidate; not yet approved for automated access.
+    reliability:
+      cache:
+        ttl_seconds: 0
+      retry:
+        max_attempts: 1
+        backoff_seconds: 0
+      rate_limit:
+        per_second: 1
+    options:
+      domain: gis.lakecountyfl.gov
+      service_path: /lakegis/rest/services/OpenData/OpenData1/FeatureServer
+      layer_id: 12
+      parcel_field: AltKey
+      parcel_value_type: text
+      owner_field: OwnerName
+      situs_address_field: PropertyAddress
+      record_id_field: OBJECTID
+      select_fields:
+        - AltKey
+        - OwnerName
+        - PropertyAddress
+        - OBJECTID
+      query_limit: 5
+      source_organization: Lake County Property Appraiser
       verified_for_automated_access: false

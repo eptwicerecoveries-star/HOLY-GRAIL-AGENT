@@ -321,7 +321,11 @@ def test_shipped_arcgis_providers_remain_unverified() -> None:
     arcgis_names = [
         row["name"] for row in registry.describe() if row["type"] == "arcgis"
     ]
-    assert set(arcgis_names) == {"example_arcgis", "franklin_county_oh_auditor_parcels"}
+    assert set(arcgis_names) == {
+        "example_arcgis",
+        "franklin_county_oh_auditor_parcels",
+        "lake_county_fl_pa_tax_parcels",
+    }
     for row in registry.describe():
         if row["type"] == "arcgis":
             provider = registry.resolve(row["name"])
