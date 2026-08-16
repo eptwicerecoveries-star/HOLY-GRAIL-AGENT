@@ -4,7 +4,8 @@
 #
 # Live Socrata adapters exist but must not be selected for a county until a real official
 # dataset is separately approved. verified_for_automated_access is an internal operational
-# gate only; it is not legal permission to automate access.
+# gate only; it is not legal permission to automate access. nyc_dcp_pluto is a disabled
+# candidate only: listable, unverified, and not selected by any county.
 # Omitted `reliability` on a custom config file keeps conservative defaults
 # (cache TTL 0, max_attempts 1, unlimited rate limit).
 
@@ -63,3 +64,33 @@ providers:
       source_organization: Example City Open Data
       verified_for_automated_access: false
       optional_credential: SURPLUS_AI_SOCRATA_EXAMPLE_APP_TOKEN
+
+  # NYC DCP PLUTO on NYC Open Data. Candidate for a later controlled live request.
+  # Not approved for automated access. Do not point a county at this provider.
+  nyc_dcp_pluto:
+    type: socrata
+    description: >-
+      NYC Department of City Planning PLUTO on NYC Open Data (64uk-42ks).
+      Candidate for controlled Phase 6D live validation; not yet approved for automated access.
+    reliability:
+      cache:
+        ttl_seconds: 0
+      retry:
+        max_attempts: 1
+        backoff_seconds: 0
+      rate_limit:
+        per_second: 1
+    options:
+      domain: data.cityofnewyork.us
+      dataset_id: 64uk-42ks
+      parcel_field: bbl
+      parcel_value_type: number
+      owner_field: ownername
+      situs_address_field: address
+      select_fields:
+        - bbl
+        - ownername
+        - address
+      query_limit: 5
+      source_organization: New York City Department of City Planning
+      verified_for_automated_access: false
