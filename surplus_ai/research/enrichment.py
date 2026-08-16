@@ -384,3 +384,38 @@ def apply_research_result(
         case_id=case_id,
         research_result_id=research_result_id,
     )
+
+
+def attempt_workflow_enrichment(
+    session: Session,
+    *,
+    case_id: uuid.UUID,
+    research_result_id: uuid.UUID,
+    trigger: str,
+) -> EnrichmentApplyResult:
+    """Phase 6E-B orchestration helper: call 6E-A apply and log workflow outcome.
+
+    Does not reimplement eligibility. Caller owns the transaction. Blocked results are
+    normal controlled outcomes (do not imply ResearchResult invalidity).
+    """
+    result = apply_research_result(
+        session,
+        case_id=case_id,
+        research_result_id=research_result_id,
+    )
+    logger.info(
+        "research_enrichment_workflow",
+        trigger=trigger,
+        case_id=str(case_id),
+        research_result_id=str(research_result_id),
+        provider_id=result.provider_id,
+        apply_attempted=True,
+        applied=result.applied,
+        blocked=result.blocked,
+        block_reason=result.block_reason.value if result.block_reason else None,
+        applied_field_count=len(result.applied_fields),
+        already_present_field_count=len(result.already_present_fields),
+        conflicting_field_count=len(result.conflicting_fields),
+        unsupported_field_count=len(result.unsupported_fields),
+    )
+    return result

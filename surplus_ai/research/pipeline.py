@@ -1,4 +1,4 @@
-"""Research pipeline: cache → pace → lookup/retry → append ResearchResult."""
+"""Research pipeline: cache → pace → lookup/retry → append ResearchResult → optional 6E apply."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from surplus_ai.database.models.surplus_case import SurplusCase
 from surplus_ai.research.cache import ResearchResultCache
 from surplus_ai.research.candidate import CandidateSelector
 from surplus_ai.research.clock import MonotonicFn, SleeperFn, WallClockFn
+from surplus_ai.research.enrichment import attempt_workflow_enrichment
 from surplus_ai.research.exceptions import CandidateSelectionError, ResearchError
 from surplus_ai.research.models import (
     PropertyLookupQuery,
@@ -33,7 +34,9 @@ __all__ = ["ResearchPipeline", "ResearchError", "load_case_with_relations"]
 class ResearchPipeline:
     """Property research. Persists ResearchResult rows and may enqueue review items.
 
-    Does not update Property, SurplusCase.status, ComplianceEvaluation, Contact, or Lead.
+    After a *new* persist, when ``requires_human_review`` is false, invokes Phase 6E-A
+    ``apply_research_result`` (fill-missing only). Cache hits do not re-apply.
+    Does not create Property/Contact/Lead, change SurplusCase.status, or Compliance.
     Does not change pending-candidate selection.
     """
 
@@ -181,6 +184,8 @@ class ResearchPipeline:
                     provider=provider.name,
                     research_result_id=str(hit.id),
                 )
+                # Cache hit: existing row only. No new persist, no review enqueue,
+                # no enrichment attempt (6E-A remains available for explicit apply).
                 return hit
 
         limiter = self._limiter(provider.name, policy.rate_limit.per_second)
@@ -203,6 +208,15 @@ class ResearchPipeline:
             outcome=outcome,
         )
         self._reviews.enqueue_for_result(row)
+        payload = row.response_payload if isinstance(row.response_payload, dict) else {}
+        if payload.get("requires_human_review") is not True:
+            # Non-review path: 6E-A decides SUCCESS/found/evidence/fill-missing.
+            attempt_workflow_enrichment(
+                self._session,
+                case_id=row.surplus_case_id,
+                research_result_id=row.id,
+                trigger="new_result",
+            )
         return row
 
 

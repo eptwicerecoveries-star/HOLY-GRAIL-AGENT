@@ -23,6 +23,7 @@ from surplus_ai.database.models.enums import (
 from surplus_ai.database.models.research_result import ResearchResult
 from surplus_ai.database.models.research_review_item import ResearchReviewItem
 from surplus_ai.database.models.surplus_case import SurplusCase
+from surplus_ai.research.enrichment import attempt_workflow_enrichment
 from surplus_ai.research.exceptions import ResearchReviewError
 from surplus_ai.research.registry import ProviderRegistry
 
@@ -328,6 +329,15 @@ class ResearchReviewQueue:
             status=new_status.value,
             resolution=new_resolution.value,
         )
+        # Prefer not invoking apply for non-usable resolutions (controlled skip).
+        # evidence_usable: call 6E-A; aggregate pending/non-usable may still block.
+        if new_resolution is ResearchReviewResolution.EVIDENCE_USABLE:
+            attempt_workflow_enrichment(
+                self._session,
+                case_id=closed.surplus_case_id,
+                research_result_id=closed.research_result_id,
+                trigger="review_resolved",
+            )
         return closed
 
     def _find_pending(
