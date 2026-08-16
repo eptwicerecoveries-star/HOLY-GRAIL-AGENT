@@ -1,4 +1,4 @@
-"""Endpoint and Socrata identifier policy. Destinations come only from config."""
+"""Endpoint and identifier policy. Destinations come only from config."""
 
 from __future__ import annotations
 
@@ -18,21 +18,36 @@ _HOSTNAME = re.compile(
 _DATASET_ID = re.compile(r"^[a-z0-9]{4}-[a-z0-9]{4}$")
 _FIELD_ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SOCRATA_NUMBER_IDENTITY = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
+_ARCGIS_PATH_SEGMENT = re.compile(r"^[A-Za-z0-9._-]+$")
 _SYSTEM_ID = ":id"
 _BLOCKED_SCHEMES = frozenset({"http", "file", "ftp", "data", "javascript", "ws", "wss"})
+_MAX_ARCGIS_SERVICE_PATH = 512
+_ARCGIS_LAYER_ID_MAX = 9999
+
+
+def _validate_public_hostname(domain: str, *, kind: str) -> str:
+    """Return a lowercase DNS hostname. Reject schemes, IPs, and local/private hosts."""
+    value = domain.strip().lower().rstrip(".")
+    if not value:
+        raise ResearchConfigError(f"{kind} must be a non-empty hostname")
+    if "://" in value or "/" in value or "\\" in value or "@" in value or ":" in value:
+        raise ResearchConfigError(f"{kind} must be a hostname without a scheme or path")
+    _reject_blocked_host(value)
+    if not _HOSTNAME.match(value):
+        raise ResearchConfigError(f"Invalid {kind} {domain!r}")
+    return value
 
 
 def validate_socrata_domain(domain: str) -> str:
     """Return a lowercase DNS hostname. Reject schemes, IPs, and local/private hosts."""
-    value = domain.strip().lower().rstrip(".")
-    if not value:
-        raise ResearchConfigError("Socrata domain must be a non-empty hostname")
-    if "://" in value or "/" in value or "\\" in value or "@" in value or ":" in value:
-        raise ResearchConfigError("Socrata domain must be a hostname without a scheme or path")
-    _reject_blocked_host(value)
-    if not _HOSTNAME.match(value):
-        raise ResearchConfigError(f"Invalid Socrata domain {domain!r}")
-    return value
+    return _validate_public_hostname(domain, kind="Socrata domain")
+
+
+def validate_arcgis_domain(domain: str) -> str:
+    """Return a lowercase DNS hostname. Same public-host rules as Socrata."""
+    if not isinstance(domain, str) or any(ch.isspace() for ch in domain):
+        raise ResearchConfigError("ArcGIS domain must not contain whitespace")
+    return _validate_public_hostname(domain, kind="ArcGIS domain")
 
 
 def _reject_blocked_host(host: str) -> None:
@@ -82,6 +97,76 @@ def socrata_resource_url(domain: str, dataset_id: str) -> str:
     host = validate_socrata_domain(domain)
     resource = validate_socrata_dataset_id(dataset_id)
     return f"https://{host}/resource/{resource}.json"
+
+
+def validate_arcgis_field_id(name: str) -> str:
+    """ArcGIS field names: letters, digits, underscore. No ``:id`` system fields."""
+    return validate_socrata_field_id(name, allow_system_id=False)
+
+
+def validate_arcgis_service_path(path: str) -> str:
+    """Validate an immutable FeatureServer service path. Never a full URL."""
+    if not isinstance(path, str):
+        raise ResearchConfigError("ArcGIS service_path must be a string")
+    value = path.strip()
+    if not value:
+        raise ResearchConfigError("ArcGIS service_path must be a non-empty path")
+    if len(value) > _MAX_ARCGIS_SERVICE_PATH:
+        raise ResearchConfigError("ArcGIS service_path exceeds maximum length")
+    if not value.startswith("/"):
+        raise ResearchConfigError("ArcGIS service_path must start with /")
+    if value.endswith("/"):
+        raise ResearchConfigError("ArcGIS service_path must not have a trailing slash")
+    if any(marker in value for marker in ("?", "#", "\\", "%", ":", "@", " ")):
+        raise ResearchConfigError(
+            "ArcGIS service_path must not contain query, fragment, encoding, "
+            "authority, or whitespace"
+        )
+    if "//" in value:
+        raise ResearchConfigError("ArcGIS service_path must not contain empty segments")
+    if "/rest/services/" not in value:
+        raise ResearchConfigError("ArcGIS service_path must contain /rest/services/")
+    if not value.endswith("/FeatureServer"):
+        raise ResearchConfigError("ArcGIS service_path must end with /FeatureServer")
+    if "MapServer" in value:
+        raise ResearchConfigError("ArcGIS service_path must not include MapServer")
+    segments = value[1:].split("/")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ResearchConfigError("ArcGIS service_path must not contain '.' or '..' segments")
+    for segment in segments:
+        if not _ARCGIS_PATH_SEGMENT.fullmatch(segment):
+            raise ResearchConfigError(
+                f"Invalid ArcGIS service_path segment {segment!r}; "
+                "use letters, digits, underscore, dot, and hyphen only"
+            )
+    return value
+
+
+def validate_arcgis_layer_id(value: object) -> int:
+    """Layer id is a non-negative integer. Bools are rejected."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ResearchConfigError("ArcGIS layer_id must be an integer")
+    if value < 0 or value > _ARCGIS_LAYER_ID_MAX:
+        raise ResearchConfigError("ArcGIS layer_id must be between 0 and 9999")
+    return value
+
+
+def arcgis_layer_url(domain: str, service_path: str, layer_id: int) -> str:
+    """Canonical FeatureServer layer URL. Never includes /query or a query string."""
+    host = validate_arcgis_domain(domain)
+    path = validate_arcgis_service_path(service_path)
+    layer = validate_arcgis_layer_id(layer_id)
+    return f"https://{host}{path}/{layer}"
+
+
+def arcgis_query_url(domain: str, service_path: str, layer_id: int) -> str:
+    """FeatureServer layer query operation URL. Query parameters are not included."""
+    return f"{arcgis_layer_url(domain, service_path, layer_id)}/query"
+
+
+def sql_string_literal(value: str) -> str:
+    """SQL-92 string literal with doubled apostrophes. Same escaping as SoQL."""
+    return soql_string_literal(value)
 
 
 def validate_public_https_url(url: str) -> str:
@@ -159,3 +244,17 @@ def soql_number_literal(value: str) -> str:
     if parsed is None:
         raise ValueError("invalid socrata number identity")
     return canonical_socrata_number_literal(parsed)
+
+
+_ARCGIS_NUMBER_IDENTITY = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
+
+
+def arcgis_number_literal(value: str) -> str:
+    """Unquoted ArcGIS number literal.
+
+    The original caller string must match the locked lexical grammar before
+    Decimal canonicalization. Surrounding whitespace is not stripped.
+    """
+    if not isinstance(value, str) or not _ARCGIS_NUMBER_IDENTITY.fullmatch(value):
+        raise ValueError("invalid arcgis number identity")
+    return soql_number_literal(value)

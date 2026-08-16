@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → stop. ArcGIS and generic REST are later 6D increments. Production county activation is a separate human decision.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (not live-validated) → stop. Official ArcGIS candidate config is 6D-ArcGIS-B. Generic REST remains after ArcGIS. Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -142,7 +142,7 @@ Shipped in this slice:
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
 - Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
-**Not in this slice:** ArcGIS, ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision.
+**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below; no official ArcGIS candidate is configured.
 
 ### Controlled NYC PLUTO live validation (2026-08-15)
 
@@ -171,8 +171,28 @@ Owner-name and address *values* were not recorded. The BBL was not added to acti
 
 No additional live request is authorized.
 
+## Phase 6D-ArcGIS-A generic offline FeatureServer foundation (implemented; not live-validated)
+
+A county-agnostic ArcGIS FeatureServer adapter is implemented. All ArcGIS tests are offline/mocked. No live ArcGIS HTTP request occurred. No official ArcGIS dataset is configured. This is not live validation and not production enablement.
+
+Shipped in this increment:
+
+- Generic `type: arcgis` provider (`ArcGISFeatureServerProvider`) with strict `extra='forbid'` options. Endpoints are constructed from validated `domain` + `service_path` + `layer_id` only. No full URL, no caller `where`, no token field, no MapServer mode.
+- Safe FeatureServer path rules: starts with `/`, no trailing slash, contains `/rest/services/`, ends with `/FeatureServer`, narrow segment grammar, no query/fragment/encoding/traversal.
+- Identity types `text` and `number` (`ArcGISIdentityValueType`). Text literals use SQL-92 apostrophe doubling. Number identities reuse the existing conservative Decimal grammar (no float). Invalid numbers fail closed before HTTP (`invalid_identity_format`).
+- One GET per `lookup()` through `ResearchHttpClient`: `where`, explicit `outFields` (never `*`), `returnGeometry=false`, `f=json`, `resultRecordCount`. No pagination, no `resultOffset`, no application retry.
+- Truncation-first incomplete results: if `exceededTransferLimit` is JSON `true` or `len(features) > query_limit`, return `error_code=result_incomplete` (`cacheable=False`, `retryable=False`, `requires_human_review=True`, empty evidence) before local matching. A non-boolean transfer-limit flag is `malformed_provider_response`.
+- Geometry, if returned anyway, is ignored. Compact provenance only. Canonical `source_url` is `https://{domain}{service_path}/{layer_id}` with no query string.
+- Disabled fake `example_arcgis` (`gis.example.gov`, `verified_for_automated_access: false`, no `access_reviewed_on`). Default remains `manual_lookup`. No county selects ArcGIS.
+- Existing Phase 6C review reasons remain sufficient (`automated_access_not_verified` / `http_401` / `http_403` / `unsafe_resolved_address` → unavailable; `result_incomplete` → provider failure).
+
+**Not in this increment:** official ArcGIS candidate configuration, Franklin County, Lake County, Shasta County, credentials/tokens, MapServer fallback, generic REST, live ArcGIS requests, 6E/6F.
+
+Franklin County remains a candidate for **6D-ArcGIS-B** only.
+
 ## Later phases (not started)
 
-- 6D later increments: ArcGIS, generic REST
+- 6D-ArcGIS-B: official ArcGIS candidate config + terms review (no live query until separately authorized)
+- 6D later increment: generic REST
 - 6E: local enrichment apply paths
 - 6F: skip-trace + Contact materialization when Lead exists

@@ -5,7 +5,8 @@
 # Live Socrata adapters exist but must not be selected for a county until a real official
 # dataset is separately approved. verified_for_automated_access is an internal operational
 # gate only; it is not legal permission to automate access. nyc_dcp_pluto is a disabled
-# candidate only: listable, unverified, and not selected by any county.
+# candidate only: listable, unverified, and not selected by any county. example_arcgis is
+# a disabled fake FeatureServer shape only; no official ArcGIS dataset is configured.
 # Omitted `reliability` on a custom config file keeps conservative defaults
 # (cache TTL 0, max_attempts 1, unlimited rate limit).
 
@@ -93,4 +94,29 @@ providers:
         - address
       query_limit: 5
       source_organization: New York City Department of City Planning
+      verified_for_automated_access: false
+
+  # Example ArcGIS FeatureServer adapter shape. Not verified for automated access
+  # and not selected by any county. Selecting it performs no HTTP.
+  example_arcgis:
+    type: arcgis
+    description: >-
+      Example ArcGIS FeatureServer adapter. Not approved for automated access.
+      No county is pointed at this provider.
+    options:
+      domain: gis.example.gov
+      service_path: /arcgis/rest/services/Example/Parcels/FeatureServer
+      layer_id: 0
+      parcel_field: PARCELID
+      parcel_value_type: text
+      owner_field: OWNER_NAME
+      situs_address_field: SITEADDRESS
+      record_id_field: OBJECTID
+      select_fields:
+        - PARCELID
+        - OWNER_NAME
+        - SITEADDRESS
+        - OBJECTID
+      query_limit: 5
+      source_organization: Example County GIS
       verified_for_automated_access: false

@@ -5,9 +5,16 @@ from decimal import localcontext
 import pytest
 
 from surplus_ai.research.endpoint import (
+    arcgis_layer_url,
+    arcgis_number_literal,
+    arcgis_query_url,
     socrata_resource_url,
     soql_number_literal,
     soql_string_literal,
+    sql_string_literal,
+    validate_arcgis_domain,
+    validate_arcgis_layer_id,
+    validate_arcgis_service_path,
     validate_public_https_url,
     validate_socrata_dataset_id,
     validate_socrata_domain,
@@ -163,3 +170,103 @@ def test_soql_number_literal_preserves_integer_magnitude_under_low_precision() -
 def test_soql_number_literal_rejects_unsafe_input(value: str) -> None:
     with pytest.raises(ValueError):
         soql_number_literal(value)
+
+
+def test_arcgis_number_literal_accepts_plain_digits() -> None:
+    assert arcgis_number_literal("123") == "123"
+    assert "'" not in arcgis_number_literal("123")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        " 123",
+        "123 ",
+        " 123 ",
+        "\t123",
+        "123\t",
+        "\n123",
+        "123\n",
+        "1 23",
+        "1\t23",
+        "   ",
+        "",
+    ],
+)
+def test_arcgis_number_literal_rejects_whitespace(value: str) -> None:
+    with pytest.raises(ValueError):
+        arcgis_number_literal(value)
+
+
+def test_sql_string_literal_doubles_apostrophes() -> None:
+    assert sql_string_literal("O'Brien") == "'O''Brien'"
+    assert sql_string_literal("'; OR 1=1--") == "'''; OR 1=1--'"
+
+
+def test_arcgis_domain_validation() -> None:
+    assert validate_arcgis_domain("GIS.Example.GOV") == "gis.example.gov"
+    for domain in (
+        "https://gis.example.gov",
+        "8.8.8.8",
+        "127.0.0.1",
+        "localhost",
+        "gis.example.gov/path",
+        " gis.example.gov",
+        "gis.example.gov:443",
+        "user:pass@gis.example.gov",
+    ):
+        with pytest.raises(ResearchConfigError):
+            validate_arcgis_domain(domain)
+
+
+def test_arcgis_service_path_validation() -> None:
+    valid = "/arcgis/rest/services/Example/Parcels/FeatureServer"
+    assert validate_arcgis_service_path(valid) == valid
+    for path in (
+        "arcgis/rest/services/Example/Parcels/FeatureServer",
+        "/arcgis/rest/services/Example/Parcels/FeatureServer/",
+        "/arcgis/services/Example/Parcels/FeatureServer",
+        "/arcgis/rest/services/Example/Parcels/MapServer",
+        "/arcgis/rest/services/Example/Parcels/FeatureServer?f=json",
+        "/arcgis/rest/services/Example/Parcels/FeatureServer#x",
+        "/arcgis/rest/services/Example%2FParcels/FeatureServer",
+        "/arcgis/rest/services/Example/../Parcels/FeatureServer",
+        "/arcgis/rest/services/./Parcels/FeatureServer",
+        "/arcgis/rest/services/Example\\Parcels/FeatureServer",
+        "/arcgis//rest/services/Example/Parcels/FeatureServer",
+        "/arcgis/rest/services/Example@x/FeatureServer",
+        "/arcgis/rest/services/Example:x/FeatureServer",
+        "https://gis.example.gov/arcgis/rest/services/Example/Parcels/FeatureServer",
+    ):
+        with pytest.raises(ResearchConfigError):
+            validate_arcgis_service_path(path)
+    too_long = "/arcgis/rest/services/" + ("A" * 500) + "/FeatureServer"
+    with pytest.raises(ResearchConfigError):
+        validate_arcgis_service_path(too_long)
+
+
+def test_arcgis_layer_id_validation() -> None:
+    assert validate_arcgis_layer_id(0) == 0
+    assert validate_arcgis_layer_id(9999) == 9999
+    for value in (-1, 10000, True, False, "0"):
+        with pytest.raises(ResearchConfigError):
+            validate_arcgis_layer_id(value)
+
+
+def test_arcgis_urls_are_canonical() -> None:
+    layer = arcgis_layer_url(
+        "gis.example.gov",
+        "/arcgis/rest/services/Example/Parcels/FeatureServer",
+        0,
+    )
+    query = arcgis_query_url(
+        "gis.example.gov",
+        "/arcgis/rest/services/Example/Parcels/FeatureServer",
+        0,
+    )
+    assert layer == (
+        "https://gis.example.gov/arcgis/rest/services/Example/Parcels/FeatureServer/0"
+    )
+    assert query == layer + "/query"
+    assert "?" not in layer
+    assert "?" not in query

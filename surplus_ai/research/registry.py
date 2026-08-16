@@ -22,6 +22,10 @@ from surplus_ai.research.policy import (
     ReliabilityPolicyPatch,
     merge_reliability,
 )
+from surplus_ai.research.providers.arcgis import (
+    ArcGISFeatureServerProvider,
+    ArcGISProviderOptions,
+)
 from surplus_ai.research.providers.base import AbstractPropertyRecordProvider
 from surplus_ai.research.providers.credentials_missing import CredentialsMissingProvider
 from surplus_ai.research.providers.manual import ManualLookupProvider
@@ -34,7 +38,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROVIDERS_PATH = PROJECT_ROOT / "config" / "research" / "providers.yaml"
 COUNTIES_CONFIG_DIR = PROJECT_ROOT / "config" / "counties"
 
-ProviderTypeName = Literal["manual", "null", "credentials_required", "socrata"]
+ProviderTypeName = Literal["manual", "null", "credentials_required", "socrata", "arcgis"]
 
 
 class ProviderSpec(BaseModel):
@@ -44,15 +48,39 @@ class ProviderSpec(BaseModel):
     description: str = ""
     requires_credential: str | None = None
     reliability: ReliabilityPolicyPatch | None = None
-    options: SocrataProviderOptions | None = None
+    options: SocrataProviderOptions | ArcGISProviderOptions | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _typed_options(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        provider_type = data.get("type")
+        raw_options = data.get("options")
+        if raw_options is None or isinstance(
+            raw_options, SocrataProviderOptions | ArcGISProviderOptions
+        ):
+            return data
+        if provider_type == "socrata":
+            out = dict(data)
+            out["options"] = SocrataProviderOptions.model_validate(raw_options)
+            return out
+        if provider_type == "arcgis":
+            out = dict(data)
+            out["options"] = ArcGISProviderOptions.model_validate(raw_options)
+            return out
+        return data
 
     @model_validator(mode="after")
     def _options_match_type(self) -> ProviderSpec:
         if self.type == "socrata":
-            if self.options is None:
+            if not isinstance(self.options, SocrataProviderOptions):
                 raise ValueError("socrata providers require options")
+        elif self.type == "arcgis":
+            if not isinstance(self.options, ArcGISProviderOptions):
+                raise ValueError("arcgis providers require options")
         elif self.options is not None:
-            raise ValueError("options is only valid for type socrata")
+            raise ValueError("options is only valid for type socrata or arcgis")
         return self
 
 
@@ -190,9 +218,17 @@ class ProviderRegistry:
             env_var = spec.requires_credential or "SURPLUS_AI_RESEARCH_API_KEY"
             return CredentialsMissingProvider(name=name, env_var=env_var)
         if spec.type == "socrata":
-            if spec.options is None:
+            if not isinstance(spec.options, SocrataProviderOptions):
                 raise ResearchConfigError(f"Socrata provider {name!r} is missing options")
             return SocrataOpenDataProvider(
+                name=name,
+                options=spec.options,
+                http=self._http_client,
+            )
+        if spec.type == "arcgis":
+            if not isinstance(spec.options, ArcGISProviderOptions):
+                raise ResearchConfigError(f"ArcGIS provider {name!r} is missing options")
+            return ArcGISFeatureServerProvider(
                 name=name,
                 options=spec.options,
                 http=self._http_client,
