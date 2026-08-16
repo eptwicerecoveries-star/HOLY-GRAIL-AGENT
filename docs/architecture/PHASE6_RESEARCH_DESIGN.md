@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → stop. Phase 6D is still **in progress** because generic REST remains. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → 6D generic REST JSON offline foundation (`rest_json`; example only; no live REST candidate) → stop. Phase 6D planned provider-family work is **complete pending staging/commit of the generic REST increment**. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -142,7 +142,7 @@ Shipped in this slice:
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
 - Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
-**Not in this slice:** ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below. Official Franklin County candidate config is in 6D-ArcGIS-B below and remains disabled. Official Lake County candidate config and the one controlled ArcGIS-C happy-path live validation are in the 6D-ArcGIS-C section below; Lake remains disabled after restoration.
+**Not in this slice:** County-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision. Generic ArcGIS FeatureServer support is in 6D-ArcGIS-A below. Official Franklin County candidate config is in 6D-ArcGIS-B below and remains disabled. Official Lake County candidate config and the one controlled ArcGIS-C happy-path live validation are in the 6D-ArcGIS-C section below; Lake remains disabled after restoration. Generic REST JSON offline foundation is in the 6D generic REST section below.
 
 ### Controlled NYC PLUTO live validation (2026-08-15)
 
@@ -186,11 +186,11 @@ Shipped in this increment:
 - Disabled fake `example_arcgis` (`gis.example.gov`, `verified_for_automated_access: false`, no `access_reviewed_on`). Default remains `manual_lookup`. No county selects ArcGIS.
 - Existing Phase 6C review reasons remain sufficient (`automated_access_not_verified` / `http_401` / `http_403` / `unsafe_resolved_address` → unavailable; `result_incomplete` → provider failure).
 
-**Not in this increment:** official ArcGIS candidate configuration, Franklin County, Lake County, Shasta County, credentials/tokens, MapServer fallback, generic REST, live ArcGIS requests, 6E/6F.
+**Not in this increment:** official ArcGIS candidate configuration, Franklin County, Lake County, Shasta County, credentials/tokens, MapServer fallback, live ArcGIS requests, 6E/6F. Generic REST is a separate 6D increment.
 
 ## Phase 6D-ArcGIS-B disabled official Franklin County candidate (config only; not live-validated)
 
-6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). Franklin is **not** the ArcGIS-C live-validation candidate: exact Tax Parcel `PARCELID` representation remains unresolved. The one controlled ArcGIS-C Lake County happy-path live validation is documented in the 6D-ArcGIS-C section below; Lake was restored disabled afterward. Phase 6D is still **in progress** because generic REST remains. Phase 6E and Phase 6F are not started.
+6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). Franklin is **not** the ArcGIS-C live-validation candidate: exact Tax Parcel `PARCELID` representation remains unresolved. The one controlled ArcGIS-C Lake County happy-path live validation is documented in the 6D-ArcGIS-C section below; Lake was restored disabled afterward. Generic REST JSON offline foundation is documented below. Phase 6E and Phase 6F are not started.
 
 This increment does **not** claim legal permission to automate, commercial-use approval, production access, proven anonymous `/query`, or proven token-free operation.
 
@@ -287,7 +287,7 @@ Canonical source URL:
 - No county selects the Franklin provider
 - Offline config tests prove registry listing and that unverified lookup fails before HTTP (`automated_access_not_verified`)
 
-**Not in this increment:** live ArcGIS query, `verified_for_automated_access: true`, county activation, tokens, MapServer, generic REST, 6E/6F.
+**Not in this increment:** live ArcGIS query, `verified_for_automated_access: true`, county activation, tokens, MapServer, 6E/6F. Generic REST is a separate 6D increment.
 
 ## Phase 6D-ArcGIS-C (one controlled Lake County happy-path live validation; provider restored disabled)
 
@@ -393,7 +393,19 @@ Canonical source URL (no query string):
 - Franklin, `example_arcgis`, and `nyc_dcp_pluto` remain disabled
 - No county selects the Lake provider
 
-**Not authorized by this validation:** ongoing production enablement, county activation, tokens, MapServer, generic REST, 6E/6F, or another live request.
+**Not authorized by this validation:** ongoing production enablement, county activation, tokens, MapServer, 6E/6F, or another live request. Generic REST is a separate 6D increment.
+
+## Phase 6D generic REST JSON foundation (implemented offline; no live REST candidate)
+
+Generic HTTPS GET JSON adapter (`RestJsonProvider`, registry `type: rest_json`) reuses `ResearchHttpClient` and the existing hardened DNS/SSRF/TLS stack. Config model `RestJsonProviderOptions` is frozen with `extra="forbid"`.
+
+**V1 request shape:** `GET https://{domain}{path}` with configured identity query param only (optional configured `limit_query_param`). One request per lookup. No POST, credentials, arbitrary headers, URL templates, pagination, or caller query dictionaries.
+
+**Response handling:** JSON object or array; optional typed `records_path` key list (max depth 5); enforce `query_limit` before local matching (`result_incomplete` when exceeded); exact local identity match; evidence mapping only; compact provenance (`provider_id`, `source_organization`, `domain`, `path`, `http_status`, `retrieved_at`, `result_count`, `match_mode`, `fields_inspected`, `record_ids`).
+
+**Access gate:** `verified_for_automated_access=false` returns `automated_access_not_verified` before DNS/HTTP. Disabled fake example only: `example_rest_json` (`api.example.gov`). No official generic REST candidate configured or live-tested. No Lake / Franklin / NYC traffic for this increment.
+
+**Not in this increment:** official REST candidate selection, credentials/auth, live REST requests, county pointers, Lead/Contact creation, 6E/6F.
 
 ## Later phases / remaining Phase 6D
 
@@ -401,8 +413,8 @@ Canonical source URL (no query string):
 - 6D-ArcGIS-A: complete generic offline FeatureServer foundation
 - 6D-ArcGIS-B: complete disabled official candidates (Franklin remains unresolved for exact `PARCELID` live-test identity)
 - 6D-ArcGIS-C: complete one controlled Lake County happy-path live validation (2026-08-16; Lake restored disabled)
-- **Next Phase 6D increment:** generic REST provider foundation (**not started**)
+- 6D generic REST JSON: complete offline foundation (`example_rest_json` only; no live REST candidate)
 - 6E: local enrichment apply paths (**not started**)
 - 6F: skip-trace + Contact materialization when Lead exists (**not started**)
 
-Phase 6D remains **IN PROGRESS** until generic REST is delivered.
+Phase 6D planned provider-family work is **complete pending staging/commit of the generic REST increment**. After that commit, Phase 6D may close; next roadmap step is Phase 6E (not started).

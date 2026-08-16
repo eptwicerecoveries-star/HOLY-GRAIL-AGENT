@@ -8,6 +8,8 @@ from surplus_ai.research.endpoint import (
     arcgis_layer_url,
     arcgis_number_literal,
     arcgis_query_url,
+    rest_json_number_identity,
+    rest_json_resource_url,
     socrata_resource_url,
     soql_number_literal,
     soql_string_literal,
@@ -16,6 +18,11 @@ from surplus_ai.research.endpoint import (
     validate_arcgis_layer_id,
     validate_arcgis_service_path,
     validate_public_https_url,
+    validate_rest_json_domain,
+    validate_rest_json_field_key,
+    validate_rest_json_path,
+    validate_rest_json_query_param,
+    validate_rest_json_records_path,
     validate_socrata_dataset_id,
     validate_socrata_domain,
     validate_socrata_field_id,
@@ -270,3 +277,89 @@ def test_arcgis_urls_are_canonical() -> None:
     assert query == layer + "/query"
     assert "?" not in layer
     assert "?" not in query
+
+
+def test_rest_json_domain_validation() -> None:
+    assert validate_rest_json_domain("API.Example.GOV") == "api.example.gov"
+    for domain in (
+        "https://api.example.gov",
+        "8.8.8.8",
+        "127.0.0.1",
+        "localhost",
+        "api.example.gov/path",
+        " api.example.gov",
+        "api.example.gov:443",
+        "user:pass@api.example.gov",
+    ):
+        with pytest.raises(ResearchConfigError):
+            validate_rest_json_domain(domain)
+
+
+def test_rest_json_path_validation() -> None:
+    assert validate_rest_json_path("/v1/parcels") == "/v1/parcels"
+    assert validate_rest_json_path("/") == "/"
+    for path in (
+        "v1/parcels",
+        "/v1/parcels/",
+        "/v1/parcels?x=1",
+        "/v1/parcels#frag",
+        "/v1/parcels%2Fextra",
+        "/v1/../parcels",
+        "/v1/./parcels",
+        "/v1\\parcels",
+        "/v1//parcels",
+        "https://api.example.gov/v1/parcels",
+        "/v1/{parcel}",
+        "/v1/${parcel}",
+        "/v1/:parcel",
+    ):
+        with pytest.raises(ResearchConfigError):
+            validate_rest_json_path(path)
+    too_long = "/v1/" + ("A" * 520)
+    with pytest.raises(ResearchConfigError):
+        validate_rest_json_path(too_long)
+
+
+def test_rest_json_query_param_validation() -> None:
+    assert validate_rest_json_query_param("parcelId") == "parcelId"
+    assert validate_rest_json_query_param("parcel.id-v1") == "parcel.id-v1"
+    for name in ("", "parcel Id", "a&b", "a=b", "a?b", "a#b", "a[b]", "1bad"):
+        with pytest.raises(ResearchConfigError):
+            validate_rest_json_query_param(name)
+
+
+def test_rest_json_field_key_validation() -> None:
+    assert validate_rest_json_field_key("parcelId") == "parcelId"
+    assert validate_rest_json_field_key("owner-name") == "owner-name"
+    for name in ("", "parcel.Id", "a[b]", "a/b", "a b", ".parcel"):
+        with pytest.raises(ResearchConfigError):
+            validate_rest_json_field_key(name)
+
+
+def test_rest_json_records_path_validation() -> None:
+    assert validate_rest_json_records_path(None) == ()
+    assert validate_rest_json_records_path(["results", "records"]) == (
+        "results",
+        "records",
+    )
+    with pytest.raises(ResearchConfigError):
+        validate_rest_json_records_path(["a", "b", "c", "d", "e", "f"])
+    with pytest.raises(ResearchConfigError):
+        validate_rest_json_records_path(["*"])
+    with pytest.raises(ResearchConfigError):
+        validate_rest_json_records_path([""])
+
+
+def test_rest_json_resource_url_has_no_query() -> None:
+    url = rest_json_resource_url("api.example.gov", "/v1/parcels")
+    assert url == "https://api.example.gov/v1/parcels"
+    assert "?" not in url
+
+
+def test_rest_json_number_identity_preserves_caller_string() -> None:
+    assert rest_json_number_identity("01") == "01"
+    assert rest_json_number_identity("1000160100") == "1000160100"
+    with pytest.raises(ValueError):
+        rest_json_number_identity("1e3")
+    with pytest.raises(ValueError):
+        rest_json_number_identity(" 1")

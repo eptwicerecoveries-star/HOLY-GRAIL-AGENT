@@ -30,6 +30,7 @@ from surplus_ai.research.providers.base import AbstractPropertyRecordProvider
 from surplus_ai.research.providers.credentials_missing import CredentialsMissingProvider
 from surplus_ai.research.providers.manual import ManualLookupProvider
 from surplus_ai.research.providers.null import NullProvider
+from surplus_ai.research.providers.rest_json import RestJsonProvider, RestJsonProviderOptions
 from surplus_ai.research.providers.socrata import SocrataOpenDataProvider, SocrataProviderOptions
 
 logger = structlog.get_logger(__name__)
@@ -38,7 +39,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROVIDERS_PATH = PROJECT_ROOT / "config" / "research" / "providers.yaml"
 COUNTIES_CONFIG_DIR = PROJECT_ROOT / "config" / "counties"
 
-ProviderTypeName = Literal["manual", "null", "credentials_required", "socrata", "arcgis"]
+ProviderTypeName = Literal[
+    "manual", "null", "credentials_required", "socrata", "arcgis", "rest_json"
+]
 
 
 class ProviderSpec(BaseModel):
@@ -48,7 +51,7 @@ class ProviderSpec(BaseModel):
     description: str = ""
     requires_credential: str | None = None
     reliability: ReliabilityPolicyPatch | None = None
-    options: SocrataProviderOptions | ArcGISProviderOptions | None = None
+    options: SocrataProviderOptions | ArcGISProviderOptions | RestJsonProviderOptions | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -58,7 +61,8 @@ class ProviderSpec(BaseModel):
         provider_type = data.get("type")
         raw_options = data.get("options")
         if raw_options is None or isinstance(
-            raw_options, SocrataProviderOptions | ArcGISProviderOptions
+            raw_options,
+            SocrataProviderOptions | ArcGISProviderOptions | RestJsonProviderOptions,
         ):
             return data
         if provider_type == "socrata":
@@ -68,6 +72,10 @@ class ProviderSpec(BaseModel):
         if provider_type == "arcgis":
             out = dict(data)
             out["options"] = ArcGISProviderOptions.model_validate(raw_options)
+            return out
+        if provider_type == "rest_json":
+            out = dict(data)
+            out["options"] = RestJsonProviderOptions.model_validate(raw_options)
             return out
         return data
 
@@ -79,8 +87,13 @@ class ProviderSpec(BaseModel):
         elif self.type == "arcgis":
             if not isinstance(self.options, ArcGISProviderOptions):
                 raise ValueError("arcgis providers require options")
+        elif self.type == "rest_json":
+            if not isinstance(self.options, RestJsonProviderOptions):
+                raise ValueError("rest_json providers require options")
         elif self.options is not None:
-            raise ValueError("options is only valid for type socrata or arcgis")
+            raise ValueError(
+                "options is only valid for type socrata, arcgis, or rest_json"
+            )
         return self
 
 
@@ -229,6 +242,14 @@ class ProviderRegistry:
             if not isinstance(spec.options, ArcGISProviderOptions):
                 raise ResearchConfigError(f"ArcGIS provider {name!r} is missing options")
             return ArcGISFeatureServerProvider(
+                name=name,
+                options=spec.options,
+                http=self._http_client,
+            )
+        if spec.type == "rest_json":
+            if not isinstance(spec.options, RestJsonProviderOptions):
+                raise ResearchConfigError(f"REST JSON provider {name!r} is missing options")
+            return RestJsonProvider(
                 name=name,
                 options=spec.options,
                 http=self._http_client,

@@ -258,3 +258,138 @@ def arcgis_number_literal(value: str) -> str:
     if not isinstance(value, str) or not _ARCGIS_NUMBER_IDENTITY.fullmatch(value):
         raise ValueError("invalid arcgis number identity")
     return soql_number_literal(value)
+
+
+_REST_JSON_QUERY_PARAM = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
+_REST_JSON_FIELD_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_REST_JSON_PATH_SEGMENT = re.compile(r"^[A-Za-z0-9._-]+$")
+_REST_JSON_RECORDS_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
+_MAX_REST_JSON_PATH = 512
+_MAX_REST_JSON_RECORDS_PATH_DEPTH = 5
+_REST_JSON_NUMBER_IDENTITY = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
+
+
+def validate_rest_json_domain(domain: str) -> str:
+    """Return a lowercase DNS hostname. Same public-host rules as ArcGIS/Socrata."""
+    if not isinstance(domain, str) or any(ch.isspace() for ch in domain):
+        raise ResearchConfigError("REST JSON domain must not contain whitespace")
+    return _validate_public_hostname(domain, kind="REST JSON domain")
+
+
+def validate_rest_json_path(path: str) -> str:
+    """Validate an immutable HTTPS path. Identity belongs in query parameters."""
+    if not isinstance(path, str):
+        raise ResearchConfigError("REST JSON path must be a string")
+    value = path.strip()
+    if not value:
+        raise ResearchConfigError("REST JSON path must be a non-empty path")
+    if len(value) > _MAX_REST_JSON_PATH:
+        raise ResearchConfigError("REST JSON path exceeds maximum length")
+    if not value.startswith("/"):
+        raise ResearchConfigError("REST JSON path must start with /")
+    if value.endswith("/") and value != "/":
+        raise ResearchConfigError("REST JSON path must not have a trailing slash")
+    if any(marker in value for marker in ("?", "#", "\\", "%", ":", "@", " ", "{", "}", "$")):
+        raise ResearchConfigError(
+            "REST JSON path must not contain query, fragment, encoding, "
+            "authority, templates, or whitespace"
+        )
+    if "//" in value:
+        raise ResearchConfigError("REST JSON path must not contain empty segments")
+    if value == "/":
+        return value
+    segments = value[1:].split("/")
+    if any(segment in {"", ".", ".."} for segment in segments):
+        raise ResearchConfigError("REST JSON path must not contain '.' or '..' segments")
+    for segment in segments:
+        if not _REST_JSON_PATH_SEGMENT.fullmatch(segment):
+            raise ResearchConfigError(
+                f"Invalid REST JSON path segment {segment!r}; "
+                "use letters, digits, underscore, dot, and hyphen only"
+            )
+    return value
+
+
+def validate_rest_json_query_param(name: str) -> str:
+    """Conservative query-parameter name. Caller never supplies arbitrary params."""
+    if not isinstance(name, str):
+        raise ResearchConfigError("REST JSON query parameter name must be a string")
+    value = name.strip()
+    if not value or value != name:
+        raise ResearchConfigError(
+            "REST JSON query parameter name must be non-empty without surrounding whitespace"
+        )
+    if not _REST_JSON_QUERY_PARAM.fullmatch(value):
+        raise ResearchConfigError(
+            f"Invalid REST JSON query parameter name {name!r}; "
+            "use letters, digits, underscore, dot, and hyphen only"
+        )
+    return value
+
+
+def validate_rest_json_field_key(name: str) -> str:
+    """Direct JSON object key for one returned record. No nested path syntax."""
+    if not isinstance(name, str):
+        raise ResearchConfigError("REST JSON field key must be a string")
+    value = name.strip()
+    if not value or value != name:
+        raise ResearchConfigError(
+            "REST JSON field key must be non-empty without surrounding whitespace"
+        )
+    if not _REST_JSON_FIELD_KEY.fullmatch(value):
+        raise ResearchConfigError(
+            f"Invalid REST JSON field key {name!r}; "
+            "use letters, digits, underscore, and hyphen only"
+        )
+    return value
+
+
+def validate_rest_json_records_path(keys: object) -> tuple[str, ...]:
+    """Typed list of object keys used to locate the records array. Max depth 5."""
+    if keys is None:
+        return ()
+    if not isinstance(keys, list | tuple):
+        raise ResearchConfigError("REST JSON records_path must be a list of keys")
+    if len(keys) > _MAX_REST_JSON_RECORDS_PATH_DEPTH:
+        raise ResearchConfigError("REST JSON records_path exceeds maximum depth")
+    parsed: list[str] = []
+    for item in keys:
+        if not isinstance(item, str):
+            raise ResearchConfigError("REST JSON records_path keys must be strings")
+        value = item.strip()
+        if not value or value != item:
+            raise ResearchConfigError(
+                "REST JSON records_path keys must be non-empty without surrounding whitespace"
+            )
+        if any(ord(ch) < 32 for ch in value):
+            raise ResearchConfigError(
+                "REST JSON records_path keys must not contain control characters"
+            )
+        if value in {".", ".."} or "*" in value or "[" in value or "]" in value:
+            raise ResearchConfigError("REST JSON records_path keys must be plain object keys")
+        if not _REST_JSON_RECORDS_KEY.fullmatch(value):
+            raise ResearchConfigError(
+                f"Invalid REST JSON records_path key {item!r}; "
+                "use letters, digits, underscore, and hyphen only"
+            )
+        parsed.append(value)
+    return tuple(parsed)
+
+
+def rest_json_resource_url(domain: str, path: str) -> str:
+    """Canonical HTTPS resource URL. Never includes a query string."""
+    host = validate_rest_json_domain(domain)
+    resource_path = validate_rest_json_path(path)
+    return f"https://{host}{resource_path}"
+
+
+def rest_json_number_identity(value: str) -> str:
+    """Validate a number identity for a query parameter. Preserves the caller string.
+
+    Does not call ``Decimal.normalize()``. Matching still uses Decimal equality.
+    """
+    if not isinstance(value, str) or not _REST_JSON_NUMBER_IDENTITY.fullmatch(value):
+        raise ValueError("invalid rest_json number identity")
+    if parse_socrata_number_identity(value) is None:
+        raise ValueError("invalid rest_json number identity")
+    return value

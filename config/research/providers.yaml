@@ -8,8 +8,9 @@
 # candidate only: listable, unverified, and not selected by any county. example_arcgis is
 # a disabled fake FeatureServer shape only. franklin_county_oh_auditor_parcels is a
 # disabled official ArcGIS candidate: listable, unverified, and not selected by any county.
-# lake_county_fl_pa_tax_parcels is the selected disabled ArcGIS-C preparation candidate:
-# listable, unverified, and not selected by any county. It is not live-validated.
+# lake_county_fl_pa_tax_parcels is the ArcGIS-C candidate restored disabled after one
+# controlled validation: listable, unverified, and not selected by any county.
+# example_rest_json is a disabled fake generic REST JSON shape only.
 # Omitted `reliability` on a custom config file keeps conservative defaults
 # (cache TTL 0, max_attempts 1, unlimited rate limit).
 
@@ -190,4 +191,31 @@ providers:
         - OBJECTID
       query_limit: 5
       source_organization: Lake County Property Appraiser
+      verified_for_automated_access: false
+
+  # Example generic REST JSON adapter shape. Not verified for automated access
+  # and not selected by any county. Selecting it performs no HTTP.
+  example_rest_json:
+    type: rest_json
+    description: >-
+      Example generic JSON REST adapter. Not approved for automated access.
+      No county is pointed at this provider.
+    options:
+      domain: api.example.gov
+      path: /v1/parcels
+      parcel_query_param: parcelId
+      parcel_field: parcelId
+      parcel_value_type: text
+      owner_field: ownerName
+      situs_address_field: propertyAddress
+      record_id_field: recordId
+      select_fields:
+        - parcelId
+        - ownerName
+        - propertyAddress
+        - recordId
+      records_path:
+        - results
+      query_limit: 5
+      source_organization: Example County
       verified_for_automated_access: false
