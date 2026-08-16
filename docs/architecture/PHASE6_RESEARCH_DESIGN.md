@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → stop → approve a real live dataset separately. ArcGIS and generic REST are later 6D increments.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → stop. ArcGIS and generic REST are later 6D increments. Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -85,6 +85,10 @@ closed (`extra='forbid'`; integers/numbers are not coerced from strings or bools
   row, no `fetched_at` refresh.
 - `--no-cache` bypasses reads only; the provider is still called and a new row is still
   persisted with the normal `cacheable` value.
+- `ttl_seconds <= 0` is always a miss: `ResearchResultCache.get` returns `None` before any
+  row or timestamp comparison (`test_ttl_zero_is_always_miss`). `ProviderOutcome.cacheable=True`
+  only means the result *may* be reused if TTL is positive; it does not create a hit by itself.
+  Direct `provider.lookup` never consults this cache.
 
 ### Local rate limiter (throttling, not evidence)
 
@@ -118,9 +122,11 @@ Human research review queue (`research_review_items`). Evidence/workflow only.
 - No backfill of 6A/6B rows. No Contact/Lead/Property/Compliance writes. No `AuditLog`.
 - CLI: `surplusai research review list|show|resolve`
 
-## Phase 6D Socrata / live-provider foundation (implemented; live validation pending)
+## Phase 6D Socrata / live-provider foundation (implemented; one controlled live validation completed 2026-08-15)
 
-Offline foundation only. **No real government or open-data endpoint has been called or verified.**
+Socrata adapter, HTTP client, identity typing, and pinned DNS/SSRF enforcement are implemented.
+One authorized NYC PLUTO live lookup was performed on 2026-08-15. The provider remains disabled.
+This is not production enablement.
 
 Shipped in this slice:
 
@@ -136,10 +142,37 @@ Shipped in this slice:
 - Phase 6B order unchanged: cache → limiter → retry wrapper → lookup → persist → 6C enqueue. HTTP client and adapter do not retry.
 - Phase 6C enums/table/lifecycle unchanged. Live error codes map onto existing `provider_unavailable` / `provider_failure` reasons (`unsafe_resolved_address` → unavailable; `dns_resolution_failed` → failure, retryable).
 
-**Not in this slice:** ArcGIS, ConfigurableREST / generic REST, county-specific provider classes, a verified live dataset, opt-in live tests. NYC PLUTO (`nyc_dcp_pluto`, `data.cityofnewyork.us` / `64uk-42ks`) is configured as an unverified disabled candidate. Typed Number BBL identity is offline-tested. No county points to PLUTO. No PLUTO live request has occurred. Final human access review and one-request live-validation approval remain pending. No live provider has been enabled.
+**Not in this slice:** ArcGIS, ConfigurableREST / generic REST, county-specific provider classes, production enablement of any live provider, opt-in live tests, county selection of PLUTO. `nyc_dcp_pluto` remains `verified_for_automated_access: false` with no `access_reviewed_on`. No county points to it. Default remains `manual_lookup`. Commercial-use/attribution judgment is a separate human decision.
+
+### Controlled NYC PLUTO live validation (2026-08-15)
+
+One human-authorized application-level lookup. No second request, no retry campaign, no SODA v3 fallback, no app token, no county pointer, no database persistence. After the request, the temporary activation was restored.
+
+| Item | Value |
+|------|--------|
+| Date | 2026-08-15 |
+| Provider | `nyc_dcp_pluto` |
+| Dataset | `64uk-42ks` |
+| Test parcel | `4142600080` |
+| HTTP status | 200 |
+| Outcome status | `success` |
+| found | true |
+| result_count | 1 |
+| match_mode | `exact_parcel` |
+| evidence fields | `parcel_id`, `owner_name_on_record`, `current_address` |
+
+Owner-name and address *values* were not recorded. The BBL was not added to active provider configuration.
+
+**Narrow meaning of “live validated”:** NYC PLUTO `64uk-42ks` accepted one SODA 2.x `/resource` request; unauthenticated access succeeded for that request; BBL `4142600080` returned one exact numeric match; expected minimum fields were usable; production DNS/SSRF/TLS protections permitted the request; adapter mapping produced the expected evidence fields.
+
+**Do not claim:** every PLUTO parcel works; all NYC failure behaviors are verified; redirects were tested; 429 was tested; authentication will never be required; commercial/legal use is settled; the provider is production-enabled; any county is using PLUTO; Phase 6D as a whole is complete.
+
+`cacheable=True` on that outcome means the adapter permits caching. Shipped `ttl_seconds: 0` still forces Phase 6B cache GET to miss. Direct `provider.lookup` bypassed the cache. No cache code change is required for this result.
+
+No additional live request is authorized.
 
 ## Later phases (not started)
 
-- 6D later increments: ArcGIS, generic REST, approved live dataset validation
+- 6D later increments: ArcGIS, generic REST
 - 6E: local enrichment apply paths
 - 6F: skip-trace + Contact materialization when Lead exists
