@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → 6D generic REST JSON offline foundation (`rest_json`; example only; no live REST candidate) → stop. Phase 6D planned provider-family work is **complete pending staging/commit of the generic REST increment**. Phase 6E and Phase 6F are **not started**. Production county activation is a separate human decision.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → 6D generic REST JSON offline foundation (`rest_json`; example only; no live REST candidate) → **Phase 6D COMPLETE** → **Phase 6E-A** explicit enrichment apply service (`apply_research_result`; fill-missing; no Property creation; no auto hook) → **Phase 6E IN PROGRESS** → next **Phase 6E-B** controlled enrichment integration hook → then Phase 6F. **Phase 6F is NOT STARTED.** Production county activation is a separate human decision.
 
 ## Phase 6A (implemented)
 
@@ -190,7 +190,7 @@ Shipped in this increment:
 
 ## Phase 6D-ArcGIS-B disabled official Franklin County candidate (config only; not live-validated)
 
-6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). Franklin is **not** the ArcGIS-C live-validation candidate: exact Tax Parcel `PARCELID` representation remains unresolved. The one controlled ArcGIS-C Lake County happy-path live validation is documented in the 6D-ArcGIS-C section below; Lake was restored disabled afterward. Generic REST JSON offline foundation is documented below. Phase 6E and Phase 6F are not started.
+6D-ArcGIS-A is a complete/committed offline FeatureServer foundation. 6D-ArcGIS-B configures Franklin County Auditor as a **disabled** official validation candidate. `franklin_county_oh_auditor_parcels` is present in `config/research/providers.yaml` and remains **disabled** (`verified_for_automated_access: false`; no `access_reviewed_on`; no county pointer). Franklin is **not** the ArcGIS-C live-validation candidate: exact Tax Parcel `PARCELID` representation remains unresolved. The one controlled ArcGIS-C Lake County happy-path live validation is documented in the 6D-ArcGIS-C section below; Lake was restored disabled afterward. Generic REST JSON offline foundation is documented below. Phase 6D is complete; Phase 6E-A is documented below; Phase 6E remains in progress pending 6E-B; Phase 6F is not started.
 
 This increment does **not** claim legal permission to automate, commercial-use approval, production access, proven anonymous `/query`, or proven token-free operation.
 
@@ -407,14 +407,27 @@ Generic HTTPS GET JSON adapter (`RestJsonProvider`, registry `type: rest_json`) 
 
 **Not in this increment:** official REST candidate selection, credentials/auth, live REST requests, county pointers, Lead/Contact creation, 6E/6F.
 
-## Later phases / remaining Phase 6D
+## Later phases / remaining Phase 6
 
 - 6D Socrata: complete happy-path controlled validation (2026-08-15; provider remains disabled)
 - 6D-ArcGIS-A: complete generic offline FeatureServer foundation
 - 6D-ArcGIS-B: complete disabled official candidates (Franklin remains unresolved for exact `PARCELID` live-test identity)
 - 6D-ArcGIS-C: complete one controlled Lake County happy-path live validation (2026-08-16; Lake restored disabled)
 - 6D generic REST JSON: complete offline foundation (`example_rest_json` only; no live REST candidate)
-- 6E: local enrichment apply paths (**not started**)
-- 6F: skip-trace + Contact materialization when Lead exists (**not started**)
+- **Phase 6D: COMPLETE**
+- **Phase 6E-A:** explicit vetted-evidence enrichment apply service implemented/tested (`apply_research_result`; no auto hook)
+- **Phase 6E: IN PROGRESS**
+- **Next:** **Phase 6E-B — controlled enrichment integration hook**
+- **Phase 6F: NOT STARTED**
 
-Phase 6D planned provider-family work is **complete pending staging/commit of the generic REST increment**. After that commit, Phase 6D may close; next roadmap step is Phase 6E (not started).
+## Phase 6E-A explicit enrichment apply service (implemented; Phase 6E IN PROGRESS)
+
+`ResearchEnrichmentApplicator.apply_research_result` / `apply_research_result(session, case_id=..., research_result_id=...)` in `surplus_ai/research/enrichment.py`.
+
+Research evidence remains evidence only. It does not establish legal entitlement, claimant identity, contact authorization, or compliance clearance. `ComplianceEvaluation` / compliance engine remain authoritative for contact eligibility.
+
+**Eligibility:** SUCCESS + `found` + non-empty evidence + exact case/result association. Human-review-required results require non-pending review items for that exact result with resolution `evidence_usable` only (other resolutions block).
+
+**V1 targets (fill-missing only):** `parcel_id` → `SurplusCase.parcel_id` and, when a Property already exists, `Property.parcel_id`; `current_address` → `SurplusCase.property_address_raw`. Never creates Property. Conflicting non-empty locals are not overwritten. `Property.last_researched_at` updates only when an existing Property's empty parcel is newly filled. Idempotent. No migration. Unsupported: `account_id`, `owner_name_on_record` (must not overwrite published-list `Owner.raw_name`), `mailing_address`, `property_record_id`.
+
+**Not in this increment (6E-B / later):** automatic pipeline/review-close wiring, CLI, Lead/Contact creation, skip tracing, 6F.
