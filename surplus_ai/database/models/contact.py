@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Float, ForeignKey, String, Text, Uuid
+from sqlalchemy import Boolean, Float, ForeignKey, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from surplus_ai.database.base import Base
@@ -16,6 +16,14 @@ if TYPE_CHECKING:
 
 class Contact(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     __tablename__ = "contacts"
+    __table_args__ = (
+        UniqueConstraint(
+            "lead_id",
+            "contact_type",
+            "value",
+            name="uq_contacts_lead_contact_type_value",
+        ),
+    )
 
     lead_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True

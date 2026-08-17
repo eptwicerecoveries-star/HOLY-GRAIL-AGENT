@@ -17,9 +17,9 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F not started** | 6A–6D shipped (Socrata/ArcGIS/REST foundations; controlled PLUTO + Lake validations; providers restored disabled). **Phase 6D COMPLETE.** **Phase 6E-A COMPLETE:** explicit `apply_research_result` fill-missing service. **Phase 6E-B COMPLETE:** controlled workflow hooks — new non-review SUCCESS results invoke apply after persist; review-required results enqueue only; `evidence_usable` resolve invokes apply (6E-A aggregate gate). Cache hits do not re-apply. Never creates Property; never maps `owner_name_on_record` → `Owner.raw_name`. No Lead/Contact/Compliance mutation. No migration. **Phase 6F NOT STARTED.** |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F IN PROGRESS (6F-A concurrency hardening)** | 6A–6E complete. **Phase 6F offline foundation present** (`surplus_ai/skip_trace/`, Lead-gated materialize, Fake/Manual/Null/CredentialsMissing). **Phase 6F-A:** DB unique `uq_contacts_lead_contact_type_value` + savepoint race recovery — this increment. Phase 6F overall **IN PROGRESS** until staging validation. No live skip-trace vendor. |
 
-**Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, Contact materialization, `scoring/`, `crm/`, `reports/`, `integrations/` (Airtable), `pipeline/` orchestration, `dashboard/`. One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
+**Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
 ---
 
@@ -49,8 +49,8 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 3. Classifier
 4. Compliance framework
 5. Lead creation
-6. Research & Enrichment — **6A–6E COMPLETE. Phase 6F NOT STARTED.**
-7+ Scoring, CRM/Airtable, reports, orchestration, multi-county hardening, dashboard, etc. (see README and `ARCHITECTURE.md` §10 status note)
+6. Research & Enrichment — **6A–6E COMPLETE. Phase 6F IN PROGRESS (6F-A contact dedupe concurrency hardening).**
+7+ Scoring, CRM/Airtable, reports, orchestration, multi-county hardening, dashboard, live skip-trace vendor selection, etc. (see README and `ARCHITECTURE.md` §10 status note)
 
 **Original `ARCHITECTURE.md` §10 roadmap (design-era numbering):**
 
@@ -67,19 +67,23 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 
 ## Next objective
 
-**Phase 6D is COMPLETE.**
+**Phase 6D–6E are COMPLETE.**
 
-**Phase 6E-A is COMPLETE** — explicit vetted-evidence enrichment apply service (`apply_research_result`).
+**Phase 6F is IN PROGRESS.**
 
-**Phase 6E-B is COMPLETE** — controlled workflow integration: after a *new* ResearchResult persist, when `requires_human_review` is false, the pipeline invokes `attempt_workflow_enrichment` / `apply_research_result` under the caller-owned session (flush only; no commit). When `requires_human_review` is true, review is enqueued and enrichment is **not** attempted until a review item is resolved to `evidence_usable`; then resolve invokes the same 6E-A apply (aggregate pending/non-usable still blocks). Non-usable resolutions do not invoke apply. **Cache hits** return the existing row only — no new persist, no review enqueue, **no enrichment attempt**.
+**Phase 6F-A (this increment):** Contact dedupe concurrency hardening — unique constraint `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)` plus nested-savepoint IntegrityError race recovery in `materialize_contact_candidate`. Fail-closed if duplicate groups already exist (no destructive cleanup). ORM metadata aligned.
 
-**Phase 6E overall: COMPLETE** (6E-A service + 6E-B non-review and post-usable-review paths).
+Still true for Phase 6F foundation:
 
-**Phase 6F: NOT STARTED** (skip-trace + Contact materialization when Lead exists). Exact next roadmap step: Phase 6F — only with separate approval.
+- Locked: **no Lead → no Contact** (`Contact.lead_id` NOT NULL + service gate).
+- Explicit `materialize_contact_candidate(session, lead_id=..., candidate=...)`.
+- Offline providers only; **zero live people-search**.
+- Phone/email only; Compliance remains outreach authority.
+- No automatic Lead-create hook for skip-trace (intentional deferred automation for this increment).
 
-Research evidence remains evidence only. Fill-missing-only. No Property creation. No Owner mutation. No Lead/Contact creation. Compliance authority unchanged. Zero new provider traffic in 6E-B.
+**Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
-Do not make live government API requests in this task. Do not treat empty compliance YAML as a reason to bypass the fail-closed gate.
+Do not make live government API or people-search requests in this task. Do not treat empty compliance YAML as a reason to bypass the fail-closed gate.
 
 ---
 
@@ -301,4 +305,4 @@ Orchestration only — reuses Phase 6E-A; does not duplicate eligibility.
 
 **Blocked apply:** controlled business outcome; ResearchResult remains valid. Unexpected exceptions propagate for caller rollback (same transaction).
 
-**Boundaries:** No Lead/Contact/skip-trace. Compliance untouched. No provider HTTP/DNS. No migration. **Phase 6F NOT STARTED.**
+**Boundaries:** No Lead/Contact creation from research enrichment. Compliance untouched. No provider HTTP/DNS for research enrichment. Phase 6F Contact work is separate (`surplus_ai/skip_trace/`; overall Phase 6F IN PROGRESS).
