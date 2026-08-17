@@ -58,6 +58,7 @@ from surplus_ai.database.models.enums import (
 EXPECTED_TABLES = {
     "airtable_sync_records",
     "audit_logs",
+    "auth_sessions",
     "call_sheet_items",
     "call_sheets",
     "compliance_evaluations",
@@ -110,7 +111,7 @@ def _case(county: County, **overrides: object) -> SurplusCase:
 
 def test_all_tables_are_registered() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 24
+    assert len(EXPECTED_TABLES) == 25
 
 
 def test_schema_matches_models(engine, _schema) -> None:  # type: ignore[no-untyped-def]

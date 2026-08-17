@@ -28,8 +28,8 @@ _PREV = "e7b2c91f4a60"
 def test_phase6f_a_migration_revises_single_current_head() -> None:
     assert down_revision == _PREV
     assert revision == "f3a8d12e90b1"
-    # Head advanced by P3-A; 6F-A remains the direct parent of that revision.
-    assert head_revision() == "fc21ee2dd624"
+    # Head advanced by later revisions; 6F-A remains an ancestor, not the current head.
+    assert head_revision() == "d4c8a1b9e703"
 
 
 @pytest.fixture

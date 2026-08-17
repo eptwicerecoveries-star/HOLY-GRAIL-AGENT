@@ -1,5 +1,6 @@
 from surplus_ai.database.models.airtable_sync_record import AirtableSyncRecord
 from surplus_ai.database.models.audit_log import AuditLog
+from surplus_ai.database.models.auth_session import AuthSession
 from surplus_ai.database.models.call_sheet import CallSheet, CallSheetItem
 from surplus_ai.database.models.compliance_evaluation import ComplianceEvaluation
 from surplus_ai.database.models.contact import Contact
@@ -25,6 +26,7 @@ from surplus_ai.database.models.user import User
 __all__ = [
     "AirtableSyncRecord",
     "AuditLog",
+    "AuthSession",
     "CallSheet",
     "CallSheetItem",
     "ComplianceEvaluation",

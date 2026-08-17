@@ -1,5 +1,6 @@
-"""Local authentication data helpers (P3-A).
+"""Local authentication data helpers.
 
-Password hashing and CLI user administration only. No HTTP login, cookies,
-sessions, or JWT. Importing this package must not require the optional auth extra.
+P3-A: password hashing and CLI user administration.
+P3-B1: digest-only server-side sessions (no HTTP/cookies).
+Importing this package must not require the optional auth extra.
 """

@@ -23,3 +23,7 @@ class UserAlreadyExistsError(UserAdminError):
 
 class UserNotFoundError(UserAdminError):
     """Reset refused because no User matches the given email."""
+
+
+class AuthSessionError(AuthError):
+    """Local auth-session create/resolve failure (not HTTP auth)."""

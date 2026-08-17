@@ -26,7 +26,8 @@ _COLUMN = "password_hash"
 def test_p3a_migration_revises_single_current_head() -> None:
     assert down_revision == _PREV
     assert revision == "fc21ee2dd624"
-    assert head_revision() == revision
+    # Head advanced by P3-B1; P3-A remains the direct parent of that revision.
+    assert head_revision() == "d4c8a1b9e703"
 
 
 @pytest.fixture
@@ -84,8 +85,8 @@ def test_p3a_password_hash_migration_lifecycle(
             {"id": user_id},
         )
 
-    up_head = _alembic(["upgrade", "head"], cli_env)
-    assert up_head.returncode == 0, up_head.stderr
+    up_rev = _alembic(["upgrade", revision], cli_env)
+    assert up_rev.returncode == 0, up_rev.stderr
     columns = _user_columns(migration_db)
     assert columns[_COLUMN] is True
 
@@ -100,7 +101,7 @@ def test_p3a_password_hash_migration_lifecycle(
     assert row.is_active is True
     assert row.password_hash is None
 
-    down = _alembic(["downgrade", "-1"], cli_env)
+    down = _alembic(["downgrade", _PREV], cli_env)
     assert down.returncode == 0, down.stderr
     assert _COLUMN not in _user_columns(migration_db)
     with migration_db.connect() as conn:
@@ -110,7 +111,7 @@ def test_p3a_password_hash_migration_lifecycle(
         ).scalar_one()
     assert survived == "mig@example.invalid"
 
-    up_again = _alembic(["upgrade", "head"], cli_env)
+    up_again = _alembic(["upgrade", revision], cli_env)
     assert up_again.returncode == 0, up_again.stderr
     assert _user_columns(migration_db)[_COLUMN] is True
     with migration_db.connect() as conn:
