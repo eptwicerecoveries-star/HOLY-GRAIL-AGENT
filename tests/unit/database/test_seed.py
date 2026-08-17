@@ -25,6 +25,8 @@ def test_seeded_roles_are_correct(session: Session) -> None:
     assert admin is not None and admin.role is UserRole.ADMIN
     assert agent is not None and agent.role is UserRole.AGENT
     assert admin.is_active is True
+    assert admin.password_hash is None
+    assert agent.password_hash is None
 
 
 def test_seed_is_idempotent(session: Session) -> None:

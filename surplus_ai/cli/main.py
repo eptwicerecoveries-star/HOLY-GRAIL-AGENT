@@ -9,6 +9,7 @@ from surplus_ai.cli.commands import db as db_commands
 from surplus_ai.cli.commands import leads as leads_commands
 from surplus_ai.cli.commands import parser as parser_commands
 from surplus_ai.cli.commands import research as research_commands
+from surplus_ai.cli.commands import users as users_commands
 from surplus_ai.utils.config import ConfigurationError, get_settings
 from surplus_ai.utils.logging_config import configure_logging
 
@@ -28,6 +29,7 @@ def build_app() -> typer.Typer:
     app.add_typer(compliance_commands.app, name="compliance")
     app.add_typer(leads_commands.app, name="leads")
     app.add_typer(research_commands.app, name="research")
+    app.add_typer(users_commands.app, name="users")
 
     @app.callback()
     def _root(

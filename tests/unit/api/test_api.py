@@ -312,3 +312,46 @@ def test_unhandled_error_is_generic(api_client: TestClient, session: Session) ->
     assert "postgresql" not in response.text.lower()
     assert "secret" not in response.text.lower()
     assert "traceback" not in response.text.lower()
+
+
+def test_api_does_not_expose_password_hash(api_client: TestClient, session: Session) -> None:
+    from surplus_ai.auth.passwords import hash_password
+    from surplus_ai.database.models.enums import UserRole
+    from surplus_ai.database.models.user import User
+
+    user = User(
+        name="Api User",
+        email="api-user@example.invalid",
+        role=UserRole.AGENT,
+        password_hash=hash_password("test-passphrase-ok"),
+    )
+    session.add(user)
+    session.flush()
+    county = _seed_county(session, slug="api-auth")
+    case = _seed_case(session, county, dedupe="api-auth-1")
+    lead = Lead(
+        surplus_case_id=case.id,
+        status=LeadStatus.QUALIFIED,
+        assigned_user_id=user.id,
+    )
+    session.add(lead)
+    session.flush()
+
+    paths = (
+        "/health",
+        "/api/v1/status",
+        "/api/v1/cases",
+        f"/api/v1/cases/{case.id}",
+        "/api/v1/leads",
+        f"/api/v1/leads/{lead.id}",
+        "/api/v1/contacts",
+        "/api/v1/research/reviews",
+        "/openapi.json",
+        "/",
+    )
+    for path in paths:
+        response = api_client.get(path.strip())
+        assert response.status_code == 200, path
+        assert "password_hash" not in response.text
+        assert "$argon2" not in response.text
+        assert "test-passphrase-ok" not in response.text

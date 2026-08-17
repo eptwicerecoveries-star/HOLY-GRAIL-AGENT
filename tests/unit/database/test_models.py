@@ -287,6 +287,17 @@ def test_set_null_on_user_delete_preserves_lead(session: Session) -> None:
     assert lead.assigned_user_id is None
 
 
+def test_user_password_hash_is_nullable_and_not_plaintext(session: Session) -> None:
+    user = User(name="Agent", email="hashless@example.invalid", role=UserRole.AGENT)
+    session.add(user)
+    session.flush()
+    assert user.password_hash is None
+    assert "password" not in User.__table__.c.keys()
+    assert "password_salt" not in User.__table__.c.keys()
+    assert "username" not in User.__table__.c.keys()
+    assert User.__table__.c.password_hash.nullable is True
+
+
 def test_user_email_is_unique(session: Session) -> None:
     session.add(User(name="A", email="dup@example.invalid"))
     session.flush()

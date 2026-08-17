@@ -28,7 +28,8 @@ _PREV = "e7b2c91f4a60"
 def test_phase6f_a_migration_revises_single_current_head() -> None:
     assert down_revision == _PREV
     assert revision == "f3a8d12e90b1"
-    assert head_revision() == revision
+    # Head advanced by P3-A; 6F-A remains the direct parent of that revision.
+    assert head_revision() == "fc21ee2dd624"
 
 
 @pytest.fixture
@@ -76,8 +77,8 @@ def test_phase6f_a_migration_lifecycle_constraint(
     assert up_prev.returncode == 0, up_prev.stderr
     assert _CONSTRAINT not in _unique_names(migration_db, "contacts")
 
-    up_head = _alembic(["upgrade", "head"], cli_env)
-    assert up_head.returncode == 0, up_head.stderr
+    up_rev = _alembic(["upgrade", revision], cli_env)
+    assert up_rev.returncode == 0, up_rev.stderr
     assert _CONSTRAINT in _unique_names(migration_db, "contacts")
 
     with migration_db.begin() as conn:
@@ -148,10 +149,10 @@ def test_phase6f_a_migration_lifecycle_constraint(
                 {"id": uuid.uuid4(), "lead_id": lead_id},
             )
 
-    down = _alembic(["downgrade", "-1"], cli_env)
+    down = _alembic(["downgrade", _PREV], cli_env)
     assert down.returncode == 0, down.stderr
     assert _CONSTRAINT not in _unique_names(migration_db, "contacts")
 
-    up_again = _alembic(["upgrade", "head"], cli_env)
+    up_again = _alembic(["upgrade", revision], cli_env)
     assert up_again.returncode == 0, up_again.stderr
     assert _CONSTRAINT in _unique_names(migration_db, "contacts")

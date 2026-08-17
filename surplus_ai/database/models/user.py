@@ -23,6 +23,8 @@ class User(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
         pg_enum(UserRole, "user_role"), nullable=False, default=UserRole.AGENT
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Encoded Argon2 hash only. Nullable: existing users are not authenticatable until set.
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     assigned_leads: Mapped[list[Lead]] = relationship(back_populates="assigned_user")
     interactions: Mapped[list[Interaction]] = relationship(back_populates="user")

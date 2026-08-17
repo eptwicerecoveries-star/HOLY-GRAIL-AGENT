@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** local FastAPI read API. **P2:** local vanilla dashboard at `GET /` (127.0.0.1 only; unauthenticated; no deploy). |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** IN PROGRESS (**P3-A** local password/user CLI foundation; **P3-B** HTTP session auth NOT STARTED). Dashboard/API remain unauthenticated and 127.0.0.1-only. |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -87,25 +87,35 @@ Local-only FastAPI read shell under `surplus_ai/api/`.
 
 - Entry: `surplus_ai.api.app:app`
 - Start: `.\.venv\Scripts\python.exe -m uvicorn surplus_ai.api.app:app --host 127.0.0.1 --port 8000`
-- Optional deps: `pip install -e ".[dev,api]"` (`fastapi`, plain `uvicorn` — not `[standard]`)
+- Optional deps: `pip install -e ".[dev,api]"` (`fastapi`, plain `uvicorn` — not `[standard]`). The optional `auth` extra is **not** required to start P1/P2.
 - OpenAPI (local): `http://127.0.0.1:8000/docs`
 
 **UNAUTHENTICATED P1 API MUST NOT BE INTERNET-FACING.** Default bind is `127.0.0.1` only. No auth, no wildcard CORS, no cloud deploy.
 
 Read-only routes: `/health`, `/api/v1/status`, cases/leads/research reviews/contacts list+detail. Contact responses omit `Contact.value`. Review responses omit research payloads. No write endpoints; no research/skip-trace/outreach invocation.
 
-### P2 — Local browser dashboard (this increment)
+### P2 — Local browser dashboard (COMPLETE FOR LOCAL READ-ONLY V1)
 
 Vanilla HTML/CSS/JS operator dashboard served by the same FastAPI app.
 
 - Open: `http://127.0.0.1:8000/`
 - Same-origin `fetch()` to `/api/v1/*` only
 - Read-only: cases, leads, research reviews, contact **metadata** (no `Contact.value`)
-- No Node/npm, no frontend framework, no CDN, no CORS, no auth, no deployment
+- No Node/npm, no frontend framework, no CDN, no CORS, no HTTP authentication, no deployment
 
 **UNAUTHENTICATED P2 DASHBOARD MUST NOT BE INTERNET-FACING.**
 
-**Not in P2:** authentication, write actions, Airtable, agents/LLMs, live skip-trace, public deployment.
+P3-A does **not** protect this dashboard. It remains anonymous.
+
+### P3 — Authentication (IN PROGRESS)
+
+See `docs/architecture/PRODUCTIZATION_P3_AUTH.md`.
+
+**P3-A (this increment):** nullable `User.password_hash`, Argon2 via optional `pwdlib[argon2]`, local `surplusai users create` / `surplusai users reset-password`. Existing seed users keep `password_hash = NULL` (not authenticatable until a CLI reset). No HTTP login, cookies, sessions, JWT, public signup, or email reset.
+
+**P3-B:** NOT STARTED (server-side session cookie, login/logout routes, dashboard/API protection).
+
+Do **not** claim authentication is complete until P3-B exists. The product is still **not** internet-safe.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
