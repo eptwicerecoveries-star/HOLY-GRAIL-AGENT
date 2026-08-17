@@ -37,6 +37,8 @@ OpenAPI (local only): `http://127.0.0.1:8000/docs`
 
 Pagination: `limit` default 50, max 100; `offset` default 0. Order: `created_at DESC`, `id DESC`.
 
-## Explicitly out of scope
+## Explicitly out of scope for P1
 
-Dashboard UI, auth, write APIs, research/skip-trace execution, outreach, Airtable, agents/LLMs, Docker API service, public deploy.
+Write APIs, research/skip-trace execution, outreach, Airtable, agents/LLMs, Docker API service, public deploy.
+
+Dashboard UI is Productization P2 (`docs/architecture/PRODUCTIZATION_P2_DASHBOARD.md`).

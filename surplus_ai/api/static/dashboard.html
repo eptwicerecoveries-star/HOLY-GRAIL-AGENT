@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Holy Grail — Operator Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <div class="brand">
+          <p class="brand-kicker">Surplus recovery</p>
+          <h1 class="brand-title">Holy Grail</h1>
+          <p class="local-badge">Local development only</p>
+        </div>
+        <nav class="nav" aria-label="Dashboard sections">
+          <a class="nav-link" data-nav="home" href="#/">Overview</a>
+          <a class="nav-link" data-nav="cases" href="#/cases">Cases</a>
+          <a class="nav-link" data-nav="leads" href="#/leads">Leads</a>
+          <a class="nav-link" data-nav="reviews" href="#/reviews">Research reviews</a>
+          <a class="nav-link" data-nav="contacts" href="#/contacts">Contacts</a>
+        </nav>
+        <p class="sidebar-note">
+          Unauthenticated read-only dashboard. Not internet-facing. Contact values
+          and research payloads are not shown.
+        </p>
+      </aside>
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="page-eyebrow">Operator console</p>
+            <h2 id="page-title">Overview</h2>
+          </div>
+          <div class="status-chip" id="status-chip" role="status">Checking system…</div>
+        </header>
+        <main id="main" class="main" tabindex="-1"></main>
+      </div>
+    </div>
+    <script type="module" src="/static/js/dashboard.js"></script>
+  </body>
+</html>

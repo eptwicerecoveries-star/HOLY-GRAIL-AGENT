@@ -7,12 +7,10 @@ from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from surplus_ai.api.app import create_app
-from surplus_ai.api.dependencies import get_db_session
 from surplus_ai.database.models.contact import Contact
 from surplus_ai.database.models.county import County
 from surplus_ai.database.models.enums import (
@@ -30,19 +28,6 @@ from surplus_ai.database.models.lead import Lead
 from surplus_ai.database.models.research_result import ResearchResult
 from surplus_ai.database.models.research_review_item import ResearchReviewItem
 from surplus_ai.database.models.surplus_case import SurplusCase
-
-
-@pytest.fixture
-def api_client(session: Session) -> Iterator[TestClient]:
-    application = create_app()
-
-    def _override() -> Iterator[Session]:
-        yield session
-
-    application.dependency_overrides[get_db_session] = _override
-    with TestClient(application) as client:
-        yield client
-    application.dependency_overrides.clear()
 
 
 def _seed_county(session: Session, slug: str = "api-p1") -> County:
@@ -310,7 +295,6 @@ def test_no_provider_or_skip_trace_imports_in_routes() -> None:
 
 
 def test_unhandled_error_is_generic(api_client: TestClient, session: Session) -> None:
-    from surplus_ai.api.app import create_app
     from surplus_ai.api.dependencies import get_db_session
 
     application = create_app()
