@@ -45,7 +45,7 @@ Authenticated local install:
 - Cookie `surplus_ai_session`: raw opaque token only; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200; host-only
 - Secure=False for `dev`/`test`; Secure=True for `prod`
 - Routes: `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`
-- Auth POSTs require Origin exactly `http://127.0.0.1:8000` (not CORS; CORS remains disabled)
+- Auth POSTs require Origin exactly matching `SURPLUS_AI_AUTH_ORIGINS` (dev default `http://127.0.0.1:8000`; not CORS; CORS remains disabled)
 - Protected: dashboard `GET /` and all business `/api/v1/*` GETs via `require_active_user`
 - Public: `/health`, `/static/*`, local `/docs` / `/redoc` / `/openapi.json`
 - Login page at `/login`; anonymous `/` → 303 `/login`; dashboard 401 → `/login`

@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session
 
 from surplus_ai.api.app import create_app
 from surplus_ai.api.dependencies import get_db_session, get_writable_db_session
-from surplus_ai.api.origin import ALLOWED_AUTH_ORIGIN
 from surplus_ai.auth.passwords import hash_password
 from surplus_ai.database.models.enums import UserRole
 from surplus_ai.database.models.user import User
+from surplus_ai.utils.config import DEFAULT_DEV_AUTH_ORIGIN
 
 TEST_PASSWORD = "local-test-password!"
-AUTH_ORIGIN_HEADERS = {"Origin": ALLOWED_AUTH_ORIGIN}
+AUTH_ORIGIN_HEADERS = {"Origin": DEFAULT_DEV_AUTH_ORIGIN}
 
 
 def _build_client(session: Session) -> tuple[object, TestClient]:

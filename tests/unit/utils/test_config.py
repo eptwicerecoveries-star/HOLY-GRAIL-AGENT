@@ -20,6 +20,8 @@ def test_settings_reads_env_prefixed_variables(monkeypatch: pytest.MonkeyPatch) 
     assert settings.env == "test"
     assert settings.log_level == "DEBUG"
     assert settings.database_url.get_secret_value() == VALID_URL
+    assert settings.auth_origin_allowlist == ("http://127.0.0.1:8000",)
+    assert settings.allowed_host_allowlist == ("127.0.0.1", "testserver")
 
 
 def test_defaults_are_applied(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -27,12 +29,16 @@ def test_defaults_are_applied(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SURPLUS_AI_ENV", raising=False)
     monkeypatch.delenv("SURPLUS_AI_LOG_LEVEL", raising=False)
     monkeypatch.delenv("SURPLUS_AI_LOG_DIR", raising=False)
+    monkeypatch.delenv("SURPLUS_AI_AUTH_ORIGINS", raising=False)
+    monkeypatch.delenv("SURPLUS_AI_ALLOWED_HOSTS", raising=False)
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.env == "dev"
     assert settings.log_level == "INFO"
     assert settings.log_dir == Path("logs")
+    assert settings.auth_origin_allowlist == ("http://127.0.0.1:8000",)
+    assert settings.allowed_host_allowlist == ("127.0.0.1",)
 
 
 def test_database_url_is_masked_in_repr(monkeypatch: pytest.MonkeyPatch) -> None:

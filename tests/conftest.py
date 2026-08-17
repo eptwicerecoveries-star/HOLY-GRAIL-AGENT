@@ -3,12 +3,16 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 
-import pytest
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+# Starlette TestClient sends Host: testserver. P4-B1 test defaults include it.
+# Must be set before surplus_ai.api.app is imported.
+os.environ["SURPLUS_AI_ENV"] = "test"
 
-import surplus_ai.database.models  # noqa: F401  (registers models on Base.metadata)
-from surplus_ai.database.base import Base
+import pytest  # noqa: E402
+from sqlalchemy import Engine, create_engine, text  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
+
+import surplus_ai.database.models  # noqa: E402, F401  (registers models on Base.metadata)
+from surplus_ai.database.base import Base  # noqa: E402
 
 TEST_DATABASE_URL = os.environ.get(
     "SURPLUS_AI_TEST_DATABASE_URL",

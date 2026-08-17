@@ -24,6 +24,7 @@ from surplus_ai.auth.sessions import digest_session_token
 from surplus_ai.database.models.auth_session import AuthSession
 from surplus_ai.database.models.enums import UserRole
 from surplus_ai.database.models.user import User
+from surplus_ai.utils.config import get_settings
 from tests.unit.api.conftest import AUTH_ORIGIN_HEADERS, TEST_PASSWORD
 
 _GENERIC_FAILURE = {
@@ -190,6 +191,44 @@ def test_login_origin_required(anonymous_client: TestClient, password_user: User
         headers={"Origin": "http://evil.example"},
     )
     assert evil.status_code == 403
+    assert "access-control-allow-origin" not in {k.lower() for k in evil.headers}
+
+
+def test_login_accepts_configured_second_origin(
+    password_user: User, session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(
+        "SURPLUS_AI_AUTH_ORIGINS",
+        "http://127.0.0.1:8000,https://app.example.invalid",
+    )
+    get_settings.cache_clear()
+    application = create_app()
+
+    def _override() -> Iterator[Session]:
+        yield session
+
+    application.dependency_overrides[get_db_session] = _override
+    application.dependency_overrides[get_writable_db_session] = _override
+    try:
+        with TestClient(application) as client:
+            ok = client.post(
+                "/api/v1/auth/login",
+                json={"email": password_user.email, "password": TEST_PASSWORD},
+                headers={"Origin": "https://app.example.invalid"},
+            )
+            rejected = client.post(
+                "/api/v1/auth/login",
+                json={"email": password_user.email, "password": TEST_PASSWORD},
+                headers={"Origin": "https://other.example.invalid"},
+            )
+    finally:
+        application.dependency_overrides.clear()
+        get_settings.cache_clear()
+
+    assert ok.status_code == 200
+    assert rejected.status_code == 403
+    assert rejected.json()["code"] == "origin_not_allowed"
+    assert "access-control-allow-origin" not in {k.lower() for k in ok.headers}
 
 
 def test_logout_revokes_and_is_idempotent(

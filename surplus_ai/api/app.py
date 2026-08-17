@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -57,8 +58,10 @@ def create_app() -> FastAPI:
     """Build the local-development ASGI application.
 
     CORS is intentionally disabled. Session-cookie authentication is localhost-only.
-    Do not bind this process to a public interface.
+    Do not bind this process to a public interface. Production Origin/Host must be
+    explicitly configured; misconfiguration fails during construction.
     """
+    settings = get_settings()
     application = FastAPI(
         title="Holy Grail API",
         description=(
@@ -73,6 +76,12 @@ def create_app() -> FastAPI:
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.add_middleware(DashboardSecurityHeadersMiddleware)
+    # Last added runs first: TrustedHost → dashboard headers → routes.
+    application.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=list(settings.allowed_host_allowlist),
+        www_redirect=False,
+    )
 
     application.include_router(dashboard.router)
     application.include_router(health.router)

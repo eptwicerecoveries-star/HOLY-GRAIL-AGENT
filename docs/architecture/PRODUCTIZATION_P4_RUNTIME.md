@@ -8,8 +8,11 @@ P4 is split. This document describes **P4-A only**.
 | P2 | **COMPLETE FOR LOCAL READ-ONLY V1** |
 | P3 | **COMPLETE FOR LOCAL AUTHENTICATED V1** |
 | P4 | **IN PROGRESS** |
-| P4-A | LOCAL CONTAINER/RUNTIME FOUNDATION IMPLEMENTED AND TESTED |
-| P4-B | **NOT STARTED** |
+| P4-A | **COMPLETE** |
+| P4-B | **IN PROGRESS** |
+| P4-B1 | ORIGIN + TRUSTED HOST PRODUCTION CONFIG IMPLEMENTED/TESTED |
+| P4-B2 | **NOT STARTED** |
+| P4-B3 | **NOT STARTED** |
 | P4-C | **NOT STARTED** |
 
 P4-A is **not** production deployed, internet-ready, TLS-enabled, or cloud-hosted.
@@ -91,8 +94,7 @@ File logs go to named volume `surplus_ai_logs` (`SURPLUS_AI_LOG_DIR=/app/logs`).
 
 ## What P4-A does not include
 
-- TLS / reverse proxy / TrustedHost / forwarded headers
-- Configurable production Origin (still `http://127.0.0.1:8000`)
+- TLS / reverse proxy / forwarded headers
 - Login rate limiting
 - Production backups / managed PostgreSQL
 - Cloud accounts, domains, public bind
@@ -101,12 +103,31 @@ File logs go to named volume `surplus_ai_logs` (`SURPLUS_AI_LOG_DIR=/app/logs`).
 - CSRF framework for future writes
 - Live research providers or skip-trace vendors
 
-## P4-B (later)
+P4-B1 adds configurable Origin/Host **settings** only. It does **not** authorize non-loopback bind.
 
-- Configuration-based production Origin allowlist
-- Trusted host / proxy posture
-- Login throttling
-- TLS deployment contract
+## P4-B1 — Origin and Trusted Host
+
+Environment (comma-separated; not secrets):
+
+```text
+SURPLUS_AI_AUTH_ORIGINS=https://app.example.invalid
+SURPLUS_AI_ALLOWED_HOSTS=app.example.invalid
+```
+
+Local `dev` defaults (no extra Compose env): Origin `http://127.0.0.1:8000`, Host `127.0.0.1`. `test` Host defaults also include `testserver` (Starlette TestClient). `localhost` is not auto-allowed.
+
+`SURPLUS_AI_ENV=prod` requires both variables. Missing/blank/invalid values fail Settings load (`ConfigurationError`) before requests. Production Origins must be canonical `https://host[:non-default-port]` (no path/query/fragment/userinfo/trailing slash). Hosts are exact lowercase hostnames (no scheme, port, or `*`).
+
+Auth POST Origin checks (login/logout only) use exact membership in the Settings allowlist. 403 `origin_not_allowed`. No CORS.
+
+Starlette `TrustedHostMiddleware` (`www_redirect=False`) uses the validated host list. Invalid Host is Starlette's 400. Middleware order: TrustedHost → dashboard security headers → routes.
+
+**P4-B1 does not authorize internet exposure.** Still required: P4-B2 login throttling (design not locked), P4-B3 HSTS/readiness/TLS contract, TLS edge, private production DB, real credentials, automatic backups, proxy trust, security review.
+
+## P4-B2 / P4-B3 (later)
+
+- P4-B2: login throttling (separate design approval; not started)
+- P4-B3: security-header / TLS contract / optional `/ready`
 
 Do not expose the app beyond loopback before P4-B is complete and reviewed.
 
