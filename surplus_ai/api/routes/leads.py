@@ -7,14 +7,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from surplus_ai.api.dependencies import get_db_session
+from surplus_ai.api.dependencies import get_db_session, require_active_user
 from surplus_ai.api.errors import not_found
 from surplus_ai.api.pagination import pagination_params
 from surplus_ai.api.queries import get_lead, list_leads
 from surplus_ai.api.schemas import LeadResponse
 from surplus_ai.database.models.lead import Lead
 
-router = APIRouter(tags=["leads"])
+router = APIRouter(tags=["leads"], dependencies=[Depends(require_active_user)])
 
 
 def _to_lead(lead: Lead, contact_count: int) -> LeadResponse:

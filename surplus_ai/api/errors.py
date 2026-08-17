@@ -57,3 +57,29 @@ def not_found(resource: str) -> StarletteHTTPException:
         status_code=404,
         detail=cast(Any, error_body(code="not_found", message=f"{resource} not found")),
     )
+
+
+def authentication_required() -> StarletteHTTPException:
+    return StarletteHTTPException(
+        status_code=401,
+        detail=cast(
+            Any,
+            error_body(
+                code="authentication_required",
+                message="Authentication is required.",
+            ),
+        ),
+    )
+
+
+def authentication_failed() -> StarletteHTTPException:
+    return StarletteHTTPException(
+        status_code=401,
+        detail=cast(
+            Any,
+            error_body(
+                code="authentication_failed",
+                message="Invalid email or password.",
+            ),
+        ),
+    )

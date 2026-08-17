@@ -7,14 +7,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from surplus_ai.api.dependencies import get_db_session
+from surplus_ai.api.dependencies import get_db_session, require_active_user
 from surplus_ai.api.errors import not_found
 from surplus_ai.api.pagination import pagination_params
 from surplus_ai.api.queries import get_review, list_reviews
 from surplus_ai.api.schemas import ResearchReviewResponse
 from surplus_ai.database.models.research_review_item import ResearchReviewItem
 
-router = APIRouter(tags=["research-reviews"])
+router = APIRouter(
+    tags=["research-reviews"], dependencies=[Depends(require_active_user)]
+)
 
 
 def _to_review(item: ResearchReviewItem) -> ResearchReviewResponse:

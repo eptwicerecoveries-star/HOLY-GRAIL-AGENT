@@ -7,12 +7,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from surplus_ai import __version__
-from surplus_ai.api.dependencies import get_db_session
+from surplus_ai.api.dependencies import get_db_session, require_active_user
 from surplus_ai.api.schemas import StatusResponse
 from surplus_ai.database.migrator import current_revision, head_revision
 from surplus_ai.utils.config import get_settings
 
-router = APIRouter(tags=["status"])
+router = APIRouter(tags=["status"], dependencies=[Depends(require_active_user)])
 
 
 @router.get("/status", response_model=StatusResponse)

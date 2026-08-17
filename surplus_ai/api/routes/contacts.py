@@ -7,14 +7,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from surplus_ai.api.dependencies import get_db_session
+from surplus_ai.api.dependencies import get_db_session, require_active_user
 from surplus_ai.api.errors import not_found
 from surplus_ai.api.pagination import pagination_params
 from surplus_ai.api.queries import get_contact, list_contacts
 from surplus_ai.api.schemas import ContactResponse
 from surplus_ai.database.models.contact import Contact
 
-router = APIRouter(tags=["contacts"])
+router = APIRouter(tags=["contacts"], dependencies=[Depends(require_active_user)])
 
 
 def _to_contact(contact: Contact) -> ContactResponse:

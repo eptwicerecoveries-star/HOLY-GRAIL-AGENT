@@ -22,10 +22,26 @@ class StatusResponse(BaseModel):
     alembic_head: str | None
     migrations_up_to_date: bool
     local_only: bool = True
-    authentication: str = "none"
+    authentication: str = "session_cookie"
     warning: str = (
-        "UNAUTHENTICATED P1 API MUST NOT BE INTERNET-FACING. Bind to 127.0.0.1 only."
+        "LOCAL SESSION-AUTHENTICATED API MUST NOT BE INTERNET-FACING. "
+        "Bind to 127.0.0.1 only."
     )
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=1, max_length=320)
+    password: str = Field(min_length=1, max_length=128, repr=False)
+
+
+class AuthUserResponse(BaseModel):
+    """Safe authenticated-user projection. No password or session secrets."""
+
+    id: UUID
+    name: str
+    email: str
+    role: str
+    is_active: bool
 
 
 class CaseResponse(BaseModel):

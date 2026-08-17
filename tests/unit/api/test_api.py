@@ -95,7 +95,7 @@ def test_status_safe(api_client: TestClient) -> None:
     assert body["application"] == "surplus-ai"
     assert body["database_reachable"] is True
     assert body["local_only"] is True
-    assert body["authentication"] == "none"
+    assert body["authentication"] == "session_cookie"
     assert "INTERNET-FACING" in body["warning"]
     blob = response.text.lower()
     assert "postgresql+psycopg" not in blob
@@ -267,14 +267,19 @@ def test_write_methods_rejected(api_client: TestClient) -> None:
         assert api_client.patch(path, json={}).status_code == 405
 
 
-def test_routes_are_get_only() -> None:
+def test_routes_write_surface_is_auth_only() -> None:
     app = create_app()
     write_methods = {"POST", "PUT", "PATCH", "DELETE"}
+    allowed_write_paths = {"/api/v1/auth/login", "/api/v1/auth/logout"}
     for route in app.routes:
         methods = getattr(route, "methods", None)
         if not methods:
             continue
-        assert methods.isdisjoint(write_methods), f"write method on {route.path}: {methods}"
+        writes = methods & write_methods
+        if not writes:
+            continue
+        assert route.path in allowed_write_paths, f"unexpected write on {route.path}: {writes}"
+        assert writes == {"POST"}
 
 
 def test_no_provider_or_skip_trace_imports_in_routes() -> None:

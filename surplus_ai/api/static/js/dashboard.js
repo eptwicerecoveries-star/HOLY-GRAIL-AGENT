@@ -1,9 +1,11 @@
-import { PAGE_SIZE, apiGet, listUrl } from "./api.js";
+import { PAGE_SIZE, apiGet, apiPost, listUrl } from "./api.js";
 
 const main = document.getElementById("main");
 const pageTitle = document.getElementById("page-title");
 const pageEyebrow = document.getElementById("page-eyebrow");
 const statusChip = document.getElementById("status-chip");
+const userChip = document.getElementById("user-chip");
+const logoutButton = document.getElementById("logout-button");
 const navLinks = [...document.querySelectorAll("[data-nav]")];
 
 const UUID =
@@ -121,6 +123,30 @@ async function refreshStatusChip() {
     statusChip.classList.add("is-bad");
   }
 }
+
+async function refreshUserChip() {
+  try {
+    const me = await apiGet("/api/v1/auth/me");
+    userChip.hidden = false;
+    userChip.textContent = `${me.name} · ${me.role}`;
+  } catch {
+    userChip.hidden = true;
+    userChip.textContent = "";
+  }
+}
+
+async function handleLogout() {
+  try {
+    await apiPost("/api/v1/auth/logout");
+  } catch {
+    // Still leave the dashboard; server clears cookie when possible.
+  }
+  window.location.assign("/login");
+}
+
+logoutButton.addEventListener("click", () => {
+  void handleLogout();
+});
 
 async function renderHome() {
   pageEyebrow.textContent = "Operator console";
@@ -424,5 +450,6 @@ window.addEventListener("hashchange", () => {
   void render();
 });
 
+void refreshUserChip();
 void refreshStatusChip();
 void render();

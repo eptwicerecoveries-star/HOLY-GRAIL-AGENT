@@ -6,6 +6,7 @@ from pathlib import Path
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DASHBOARD_HTML = STATIC_DIR / "dashboard.html"
+LOGIN_HTML = STATIC_DIR / "login.html"
 
 DASHBOARD_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

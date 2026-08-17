@@ -1,6 +1,6 @@
 # Productization P3 — Authentication foundation
 
-Local authentication is split across P3-A (passwords/CLI), P3-B1 (server-side session rows), and P3-B2 (HTTP cookies/login).
+Local authentication spans P3-A (passwords/CLI), P3-B1 (server-side session rows), and P3-B2 (HTTP cookies/login).
 
 ## Status
 
@@ -8,55 +8,75 @@ Local authentication is split across P3-A (passwords/CLI), P3-B1 (server-side se
 |-----------|--------|
 | P1 | **COMPLETE** |
 | P2 | **COMPLETE FOR LOCAL READ-ONLY V1** |
-| P3 | **IN PROGRESS** |
+| P3 | **COMPLETE FOR LOCAL AUTHENTICATED V1** |
 | P3-A | **COMPLETE** — password hash + local user CLI |
-| P3-B1 | server-side session model/token service implemented and tested |
-| P3-B2 | **NOT STARTED** |
+| P3-B1 | **COMPLETE** — server-side session model/token service |
+| P3-B2 | **LOCAL HTTP SESSION AUTHENTICATION IMPLEMENTED/TESTED** |
 
-This is **not** “authentication complete.”
+Holy Grail local product now has authenticated login, revocable server-side sessions, a protected dashboard, and a protected read API — still **localhost-only**.
+
+This is **not** internet-ready or cloud-deployed.
 
 ## P3-A (COMPLETE)
 
 - Nullable `users.password_hash` (Argon2 via optional `pwdlib[argon2]`)
 - Local Typer: `surplusai users create` / `surplusai users reset-password`
-- Login identifier: exact unique `User.email`
-- Optional extra: `auth = ["pwdlib[argon2]>=0.3.1,<0.4"]` (not required for P1/P2 or P3-B1 session primitives)
+- Login identifier: exact unique `User.email` (no case-fold)
+- Optional extra: `auth = ["pwdlib[argon2]>=0.3.1,<0.4"]` — **not** a core dependency
+- P1/P2 API/dashboard foundations do not require `[auth]` to import or start
+- P3 HTTP **login** requires `[auth]` for Argon2 verification (pwdlib is imported lazily; missing extra cannot authenticate)
 
-## P3-B1 (this increment)
+Authenticated local install:
 
-- Table `auth_sessions`: `id`, `user_id` (FK → `users.id` ON DELETE CASCADE), `token_digest` (unique SHA-256 hex), `created_at`, `expires_at`
-- Service `surplus_ai.auth.sessions`: `generate_session_token` (`secrets.token_urlsafe(32)`), `digest_session_token`, `create_auth_session`, `resolve_auth_session`, `revoke_auth_session`
-- Raw bearer token is ephemeral only; PostgreSQL stores the digest
-- Absolute lifetime: **12 hours**; no idle timeout; expired rows may remain
-- Multiple concurrent sessions per user allowed
-- Caller owns DB transactions (flush only; no service commit)
-- **Zero new Python dependencies**; no session signing secret
-- Auth sessions are **not** written to `AuditLog`; no automatic model snapshot includes `token_digest`
+```text
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,api,auth]"
+.\.venv\Scripts\python.exe -m uvicorn surplus_ai.api.app:app --host 127.0.0.1 --port 8000
+```
 
-## What is still true after P3-B1
+## P3-B1 (COMPLETE)
 
-- Dashboard and API are **STILL anonymous**
-- No HTTP login / logout / `/auth/me`
-- No cookie issuance or parsing
-- No route protection
-- No Origin / CSRF implementation yet
-- No JWT / OAuth
-- Still bound to **127.0.0.1**
-- **NOT internet safe**
-- No business write HTTP API
+- Table `auth_sessions`: digest-only rows; FK CASCADE to `users`
+- Service `surplus_ai.auth.sessions` (flush only; caller commits)
+- Absolute **12-hour** lifetime; multiple concurrent sessions allowed
+- Zero new Python dependencies; no session signing secret
+
+## P3-B2 (this increment)
+
+- Cookie `surplus_ai_session`: raw opaque token only; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200; host-only
+- Secure=False for `dev`/`test`; Secure=True for `prod`
+- Routes: `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`
+- Auth POSTs require Origin exactly `http://127.0.0.1:8000` (not CORS; CORS remains disabled)
+- Protected: dashboard `GET /` and all business `/api/v1/*` GETs via `require_active_user`
+- Public: `/health`, `/static/*`, local `/docs` / `/redoc` / `/openapi.json`
+- Login page at `/login`; anonymous `/` → 303 `/login`; dashboard 401 → `/login`
+- Generic login failure; unknown-email dummy Argon2 verify for timing
+- Reuses P3-A `verify_user_credentials` and P3-B1 session service
+- No JWT, OAuth, SessionMiddleware, or `SURPLUS_AI_SESSION_SECRET`
+- No business write HTTP API; CSRF token framework **not** implemented (required before any future cookie-authenticated business writes)
+
+## Still true after P3-B2
+
+- Bound to **127.0.0.1**
+- **NOT internet safe / NOT cloud deployed**
+- No role-based HTTP authorization (only authenticated + `is_active`)
+- No public signup / email reset
 - `Contact.value` still omitted
 - Research raw payloads still omitted
+- Business API still GET-only (except auth login/logout)
 
-**UNAUTHENTICATED P1/P2 HTTP MUST NOT BE INTERNET-FACING.**
+**SESSION-AUTHENTICATED LOCAL HTTP MUST NOT BE INTERNET-FACING.**
 
-## P3-B2 remaining scope (not started)
+## Remaining before non-local exposure
 
-- HttpOnly cookie (`surplus_ai_session`)
-- `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`
-- Protect dashboard and `/api/v1/*` (except health/login)
-- Login page + dashboard 401/logout handling
-- Origin allowlist for auth POSTs
-- CSRF before future cookie-authenticated business writes
-- Rate limiting before any non-local exposure
+- HTTPS/TLS
+- Secure-cookie production deployment validation
+- Reverse proxy / deployment hardening
+- Login brute-force / rate limiting
+- Production DB/runtime
+- Backup/restore strategy
+- Secret/config review
+- Security review
+- CSRF protection before business writes
+- Production origin policy
 
-Even after P3-B2, internet exposure still requires TLS, Secure cookies, reverse proxy, production runtime/DB, backups, and a security review.
+Authentication alone does **not** solve these.

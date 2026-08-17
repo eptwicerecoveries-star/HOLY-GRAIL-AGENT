@@ -23,9 +23,10 @@
           <a class="nav-link" data-nav="contacts" href="#/contacts">Contacts</a>
         </nav>
         <p class="sidebar-note">
-          Unauthenticated read-only dashboard. Not internet-facing. Contact values
-          and research payloads are not shown.
+          Authenticated read-only dashboard. Localhost only. Contact values and
+          research payloads are not shown.
         </p>
+        <button type="button" class="logout-button" id="logout-button">Log out</button>
       </aside>
       <div class="workspace">
         <header class="topbar">
@@ -33,7 +34,10 @@
             <p class="eyebrow" id="page-eyebrow">Operator console</p>
             <h2 id="page-title">Overview</h2>
           </div>
-          <div class="status-chip" id="status-chip" role="status">Checking system…</div>
+          <div class="topbar-meta">
+            <p class="user-chip" id="user-chip" hidden></p>
+            <div class="status-chip" id="status-chip" role="status">Checking system…</div>
+          </div>
         </header>
         <main id="main" class="main" tabindex="-1"></main>
       </div>

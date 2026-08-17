@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** IN PROGRESS (**P3-A** COMPLETE; **P3-B1** server-side session model; **P3-B2** HTTP session auth NOT STARTED). Dashboard/API remain unauthenticated and 127.0.0.1-only. |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** COMPLETE FOR LOCAL AUTHENTICATED V1 (P3-A/B1/B2). Still **127.0.0.1** only — **NOT** internet-ready. |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -87,37 +87,43 @@ Local-only FastAPI read shell under `surplus_ai/api/`.
 
 - Entry: `surplus_ai.api.app:app`
 - Start: `.\.venv\Scripts\python.exe -m uvicorn surplus_ai.api.app:app --host 127.0.0.1 --port 8000`
-- Optional deps: `pip install -e ".[dev,api]"` (`fastapi`, plain `uvicorn` — not `[standard]`). The optional `auth` extra is **not** required to start P1/P2.
+- Optional deps for P1/P2 foundations: `pip install -e ".[dev,api]"` (`fastapi`, plain `uvicorn` — not `[standard]`). The optional `auth` extra is **not** required to start the P1/P2 API/dashboard process.
+- **P3 authenticated local use** (HTTP login / password verification): install with the auth extra — `.\.venv\Scripts\python.exe -m pip install -e ".[dev,api,auth]"`. `[auth]` remains optional (not a core dependency). App import/startup does not require pwdlib; login cannot succeed without it.
 - OpenAPI (local): `http://127.0.0.1:8000/docs`
 
-**UNAUTHENTICATED P1 API MUST NOT BE INTERNET-FACING.** Default bind is `127.0.0.1` only. No auth, no wildcard CORS, no cloud deploy.
+**SESSION-AUTHENTICATED P1 API MUST NOT BE INTERNET-FACING.** Default bind is `127.0.0.1` only. No wildcard CORS, no cloud deploy.
 
-Read-only routes: `/health`, `/api/v1/status`, cases/leads/research reviews/contacts list+detail. Contact responses omit `Contact.value`. Review responses omit research payloads. No write endpoints; no research/skip-trace/outreach invocation.
+Read-only business routes (auth required): `/api/v1/status`, cases/leads/research reviews/contacts list+detail. Public: `/health`, `/docs` (local-dev only), `/static/*`. Auth: `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`. Contact responses omit `Contact.value`. Review responses omit research payloads. No business write endpoints; no research/skip-trace/outreach invocation.
 
 ### P2 — Local browser dashboard (COMPLETE FOR LOCAL READ-ONLY V1)
 
 Vanilla HTML/CSS/JS operator dashboard served by the same FastAPI app.
 
-- Open: `http://127.0.0.1:8000/`
-- Same-origin `fetch()` to `/api/v1/*` only
+- Open: `http://127.0.0.1:8000/` (redirects to `/login` when anonymous)
+- Same-origin `fetch()` to `/api/v1/*` only; HttpOnly session cookie
 - Read-only: cases, leads, research reviews, contact **metadata** (no `Contact.value`)
-- No Node/npm, no frontend framework, no CDN, no CORS, no HTTP authentication, no deployment
+- No Node/npm, no frontend framework, no CDN, no CORS, no deployment
 
-**UNAUTHENTICATED P2 DASHBOARD MUST NOT BE INTERNET-FACING.**
+**SESSION-AUTHENTICATED P2 DASHBOARD MUST NOT BE INTERNET-FACING.**
 
-P3-A does **not** protect this dashboard. It remains anonymous.
-
-### P3 — Authentication (IN PROGRESS)
+### P3 — Authentication (COMPLETE FOR LOCAL AUTHENTICATED V1)
 
 See `docs/architecture/PRODUCTIZATION_P3_AUTH.md`.
 
 **P3-A:** COMPLETE — nullable `User.password_hash`, Argon2 via optional `pwdlib[argon2]`, local `surplusai users create` / `surplusai users reset-password`.
 
-**P3-B1 (this increment):** server-side `auth_sessions` table + opaque-token/SHA-256 digest service. Raw tokens are never persisted. No HTTP login, cookies, route protection, or dashboard changes yet.
+**P3-B1:** COMPLETE — server-side `auth_sessions` + opaque-token/SHA-256 digest service.
 
-**P3-B2:** NOT STARTED (HttpOnly cookie, login/logout routes, `/auth/me`, dashboard protection, Origin checks).
+**P3-B2 (this increment):** LOCAL HTTP session authentication — login/logout/`/auth/me`, HttpOnly `surplus_ai_session` cookie, Origin checks on auth POSTs, protected dashboard + business API.
 
-Dashboard/API remain **anonymous**. Still **127.0.0.1** only. **Not** internet-safe. Do **not** claim authentication is complete until P3-B2 exists.
+Authenticated P3 local setup:
+
+```text
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,api,auth]"
+.\.venv\Scripts\python.exe -m uvicorn surplus_ai.api.app:app --host 127.0.0.1 --port 8000
+```
+
+Still **127.0.0.1** only. **Not** internet-safe. Authentication alone does **not** authorize public deployment.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
