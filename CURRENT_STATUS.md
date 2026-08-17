@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F IN PROGRESS (6F-A concurrency hardening)** | 6A–6E complete. **Phase 6F offline foundation present** (`surplus_ai/skip_trace/`, Lead-gated materialize, Fake/Manual/Null/CredentialsMissing). **Phase 6F-A:** DB unique `uq_contacts_lead_contact_type_value` + savepoint race recovery — this increment. Phase 6F overall **IN PROGRESS** until staging validation. No live skip-trace vendor. |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | 6A–6E complete. **Phase 6F-A:** Lead-gated Contact materialization + DB unique dedupe. **Phase 6F-B:** explicit `run_skip_trace_for_lead` offline orchestration (Fake/Manual/Null/CredentialsMissing → candidates → materialize). No live skip-trace vendor. No automatic Lead hook. |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -49,7 +49,7 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 3. Classifier
 4. Compliance framework
 5. Lead creation
-6. Research & Enrichment — **6A–6E COMPLETE. Phase 6F IN PROGRESS (6F-A contact dedupe concurrency hardening).**
+6. Research & Enrichment — **6A–6E COMPLETE. Phase 6F COMPLETE FOR OFFLINE/CORE V1 (6F-A + 6F-B).**
 7+ Scoring, CRM/Airtable, reports, orchestration, multi-county hardening, dashboard, live skip-trace vendor selection, etc. (see README and `ARCHITECTURE.md` §10 status note)
 
 **Original `ARCHITECTURE.md` §10 roadmap (design-era numbering):**
@@ -69,17 +69,17 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 
 **Phase 6D–6E are COMPLETE.**
 
-**Phase 6F is IN PROGRESS.**
+**Phase 6F is COMPLETE FOR OFFLINE/CORE V1** (6F-A + 6F-B).
 
-**Phase 6F-A (this increment):** Contact dedupe concurrency hardening — unique constraint `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)` plus nested-savepoint IntegrityError race recovery in `materialize_contact_candidate`. Fail-closed if duplicate groups already exist (no destructive cleanup). ORM metadata aligned.
+**Phase 6F-A:** Contact dedupe concurrency hardening — unique constraint `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)` plus nested-savepoint IntegrityError race recovery in `materialize_contact_candidate`.
 
-Still true for Phase 6F foundation:
+**Phase 6F-B:** Explicit Lead-bound offline orchestration — `run_skip_trace_for_lead(session, lead_id=..., provider=...)` invokes one supplied offline provider once, then routes eligible candidates through Phase 6F-A materialization. Lead gate runs before provider invocation. No automatic Lead-create hook.
 
-- Locked: **no Lead → no Contact** (`Contact.lead_id` NOT NULL + service gate).
-- Explicit `materialize_contact_candidate(session, lead_id=..., candidate=...)`.
-- Offline providers only; **zero live people-search**.
-- Phone/email only; Compliance remains outreach authority.
-- No automatic Lead-create hook for skip-trace (intentional deferred automation for this increment).
+**Holy Grail CORE PIPELINE** is functionally end-to-end for **OFFLINE/CONTROLLED V1**:
+
+upstream case/research/compliance/Lead → vetted research enrichment → existing Lead → explicit offline skip trace → candidate gating → Contact.
+
+That claim does **not** mean live people-search, outreach automation, CRM/Airtable, dashboard, or production deployment are complete.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
@@ -305,4 +305,4 @@ Orchestration only — reuses Phase 6E-A; does not duplicate eligibility.
 
 **Blocked apply:** controlled business outcome; ResearchResult remains valid. Unexpected exceptions propagate for caller rollback (same transaction).
 
-**Boundaries:** No Lead/Contact creation from research enrichment. Compliance untouched. No provider HTTP/DNS for research enrichment. Phase 6F Contact work is separate (`surplus_ai/skip_trace/`; overall Phase 6F IN PROGRESS).
+**Boundaries:** No Lead/Contact creation from research enrichment. Compliance untouched. No provider HTTP/DNS for research enrichment. Phase 6F Contact work is separate (`surplus_ai/skip_trace/`; COMPLETE FOR OFFLINE/CORE V1).

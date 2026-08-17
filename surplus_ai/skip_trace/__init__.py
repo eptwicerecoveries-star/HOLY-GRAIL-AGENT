@@ -24,6 +24,11 @@ from surplus_ai.skip_trace.providers.credentials_missing import CredentialsMissi
 from surplus_ai.skip_trace.providers.fake import FakeSkipTraceProvider
 from surplus_ai.skip_trace.providers.manual import ManualSkipTraceProvider
 from surplus_ai.skip_trace.providers.null import NullSkipTraceProvider
+from surplus_ai.skip_trace.workflow import (
+    SkipTraceWorkflowBlockReason,
+    SkipTraceWorkflowResult,
+    run_skip_trace_for_lead,
+)
 
 __all__ = [
     "AbstractSkipTraceProvider",
@@ -37,5 +42,8 @@ __all__ = [
     "NullSkipTraceProvider",
     "SkipTraceLookupResult",
     "SkipTraceStatus",
+    "SkipTraceWorkflowBlockReason",
+    "SkipTraceWorkflowResult",
     "materialize_contact_candidate",
+    "run_skip_trace_for_lead",
 ]

@@ -17,7 +17,7 @@
    access controls.
 4. **Compliance boundary:** Research never overrides `ComplianceEvaluation`, creates or
    promotes leads, invents statutes, or decides entitlement/contact eligibility.
-5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → 6D generic REST JSON offline foundation (`rest_json`; example only; no live REST candidate) → **Phase 6D COMPLETE** → **Phase 6E COMPLETE** → **Phase 6F IN PROGRESS** (offline Lead-gated Contact foundation + 6F-A concurrency-safe Contact dedupe). Production county activation and live people-search vendors are separate human decisions.
+5. **Incremental delivery:** 6A → 6B → 6C → 6D Socrata/HTTP foundation → one controlled NYC PLUTO live validation (2026-08-15; provider remains disabled) → 6D-ArcGIS-A generic offline FeatureServer foundation (complete/committed) → 6D-ArcGIS-B disabled official Franklin County candidate config (not live-validated; exact `PARCELID` unresolved) → 6D-ArcGIS-C preparation disabled Lake County candidate → one controlled Lake County ArcGIS happy-path live validation (2026-08-16; provider restored disabled) → 6D generic REST JSON offline foundation (`rest_json`; example only; no live REST candidate) → **Phase 6D COMPLETE** → **Phase 6E COMPLETE** → **Phase 6F COMPLETE FOR OFFLINE/CORE V1** (6F-A Contact materialization + concurrency-safe dedupe; 6F-B explicit Lead-bound offline skip-trace orchestration). Production county activation and live people-search vendors are separate human decisions.
 
 ## Phase 6A (implemented)
 
@@ -418,7 +418,9 @@ Generic HTTPS GET JSON adapter (`RestJsonProvider`, registry `type: rest_json`) 
 - **Phase 6E-A: COMPLETE** — explicit vetted-evidence enrichment apply service
 - **Phase 6E-B: COMPLETE** — controlled enrichment workflow integration
 - **Phase 6E: COMPLETE**
-- **Phase 6F: IN PROGRESS** — offline Lead-gated Contact foundation; **6F-A** concurrency-safe dedupe (unique + savepoint race recovery)
+- **Phase 6F-A: COMPLETE** — Lead-gated Contact materialization + concurrency-safe dedupe
+- **Phase 6F-B: COMPLETE** — explicit Lead-bound offline skip-trace orchestration
+- **Phase 6F: COMPLETE FOR OFFLINE/CORE V1**
 
 ## Phase 6E-A explicit enrichment apply service (COMPLETE)
 
@@ -446,9 +448,9 @@ Orchestration hooks only. Authority for eligibility/fill-missing remains Phase 6
 
 **Not in Phase 6E-B:** Lead creation from research success, Compliance changes, provider/network work, migrations.
 
-## Phase 6F skip-trace + Contact materialization (IN PROGRESS)
+## Phase 6F skip-trace + Contact materialization (COMPLETE FOR OFFLINE/CORE V1)
 
-`surplus_ai/skip_trace/`: typed `ContactCandidate` / `SkipTraceLookupResult`, `AbstractSkipTraceProvider`, Fake/Manual/Null/CredentialsMissing providers, and `materialize_contact_candidate(session, lead_id=..., candidate=...)`.
+`surplus_ai/skip_trace/`: typed `ContactCandidate` / `SkipTraceLookupResult`, `AbstractSkipTraceProvider`, Fake/Manual/Null/CredentialsMissing providers, `materialize_contact_candidate(session, lead_id=..., candidate=...)`, and **Phase 6F-B** `run_skip_trace_for_lead(session, lead_id=..., provider=...)`.
 
 **Locked rules:**
 
@@ -461,6 +463,9 @@ Orchestration hooks only. Authority for eligibility/fill-missing remains Phase 6
 - V1 materializes **phone** and **email** only (NANP / deterministic email normalize).
 - `requires_human_review` candidates do not auto-materialize (no new review queue in V1).
 - **Phase 6F-A:** DB unique `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)`; app pre-check retained; nested savepoint recovers expected duplicate races as `already_present`; unrelated IntegrityError propagates. Migration fails closed if duplicate groups already exist (no destructive cleanup).
+- **Phase 6F-B:** Explicit orchestration only — Lead gate before provider; one offline provider invocation per call; provider-level `requires_human_review` fail-closed (no auto-materialize); eligible candidates go through 6F-A materializer; no LeadPipeline/research/scheduler hook.
 - No raw vendor payloads. Logs: lead/contact IDs, provider_id, type, reason codes — never full phone/email.
 - **No live skip-trace vendor** without separate human approval of vendor/terms/credentials.
-- Automatic Lead-create skip-trace hook is intentionally deferred; explicit materialize path is the V1 workflow.
+- Automatic Lead-create skip-trace hook remains intentionally deferred productization.
+
+**Holy Grail CORE PIPELINE (offline/controlled V1):** case/research/compliance/Lead systems → vetted research enrichment → existing Lead → explicit offline skip trace → candidate gating → Contact. Not a claim of live vendor, outreach, CRM, or production deployment completeness.
