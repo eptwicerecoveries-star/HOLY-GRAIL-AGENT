@@ -1,12 +1,17 @@
+# LOCAL P4-A runtime only. DEVELOPMENT credentials. Not internet-facing.
+# Host ports are loopback-bound. Do NOT change them to 0.0.0.0 / bare 8000:8000.
+# Do NOT run: docker compose down -v  unless you intend to delete local DB/log volumes.
+
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: surplus_ai
       POSTGRES_PASSWORD: surplus_ai_dev
       POSTGRES_DB: surplus_ai
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - surplus_ai_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,5 +20,48 @@ services:
       timeout: 5s
       retries: 10
 
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SURPLUS_AI_ENV: dev
+      SURPLUS_AI_DATABASE_URL: postgresql+psycopg://surplus_ai:surplus_ai_dev@postgres:5432/surplus_ai
+      SURPLUS_AI_LOG_LEVEL: INFO
+      SURPLUS_AI_LOG_DIR: /app/logs
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - surplus_ai_logs:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  migrate:
+    profiles: ["migrate"]
+    build: .
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SURPLUS_AI_ENV: dev
+      SURPLUS_AI_DATABASE_URL: postgresql+psycopg://surplus_ai:surplus_ai_dev@postgres:5432/surplus_ai
+      SURPLUS_AI_LOG_LEVEL: INFO
+      SURPLUS_AI_LOG_DIR: /app/logs
+    command: ["surplusai", "db", "migrate"]
+
 volumes:
   surplus_ai_pgdata:
+  surplus_ai_logs:

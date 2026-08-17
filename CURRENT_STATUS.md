@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** COMPLETE FOR LOCAL AUTHENTICATED V1 (P3-A/B1/B2). Still **127.0.0.1** only — **NOT** internet-ready. |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** COMPLETE FOR LOCAL AUTHENTICATED V1. **P4:** IN PROGRESS (**P4-A** local container/runtime foundation; **P4-B/P4-C** NOT STARTED). Still **127.0.0.1** only — **NOT** internet-ready. |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -124,6 +124,31 @@ Authenticated P3 local setup:
 ```
 
 Still **127.0.0.1** only. **Not** internet-safe. Authentication alone does **not** authorize public deployment.
+
+### P4 — Always-on runtime (IN PROGRESS)
+
+See `docs/architecture/PRODUCTIZATION_P4_RUNTIME.md`.
+
+**P4-A (this increment):** LOCAL CONTAINER/RUNTIME FOUNDATION IMPLEMENTED AND TESTED — `app` + `postgres` Compose stack, Python 3.12 image with `.[api,auth]`, one Uvicorn worker, explicit one-shot `migrate` profile, host ports loopback-only (`127.0.0.1:8000` and `127.0.0.1:5432`).
+
+**P4-B:** NOT STARTED (production Origin, login throttling, trusted proxy/host, TLS contract).
+
+**P4-C:** NOT STARTED (hosting account, managed DB, domain/TLS, backups, real deploy).
+
+Local container workflow (not a public deployment):
+
+```text
+docker compose build app
+docker compose up -d postgres
+docker compose --profile migrate run --rm migrate
+docker compose up -d app
+```
+
+URL: `http://127.0.0.1:8000`. First user: `docker compose exec app surplusai users create ...` (hidden password prompt; no default password).
+
+**Do not** run `docker compose down -v` unless intentionally deleting local database/log volumes.
+
+Still localhost-only. No TLS, reverse proxy, production Origin, login rate limiting, production backups, managed production DB, cloud runtime, workers, or business writes. CSRF design remains required before cookie-authenticated business writes. Providers remain disabled/manual. No live skip-trace.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
