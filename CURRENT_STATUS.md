@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | 6A–6E complete. **Phase 6F-A:** Lead-gated Contact materialization + DB unique dedupe. **Phase 6F-B:** explicit `run_skip_trace_for_lead` offline orchestration (Fake/Manual/Null/CredentialsMissing → candidates → materialize). No live skip-trace vendor. No automatic Lead hook. |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **Productization P1:** local FastAPI read API under `surplus_ai/api/` (127.0.0.1 only; unauthenticated; no dashboard/deploy). |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -71,19 +71,42 @@ Two numbering systems appear in the docs. **Use the implementation numbering bel
 
 **Phase 6F is COMPLETE FOR OFFLINE/CORE V1** (6F-A + 6F-B).
 
-**Phase 6F-A:** Contact dedupe concurrency hardening — unique constraint `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)` plus nested-savepoint IntegrityError race recovery in `materialize_contact_candidate`.
-
-**Phase 6F-B:** Explicit Lead-bound offline orchestration — `run_skip_trace_for_lead(session, lead_id=..., provider=...)` invokes one supplied offline provider once, then routes eligible candidates through Phase 6F-A materialization. Lead gate runs before provider invocation. No automatic Lead-create hook.
-
-**Holy Grail CORE PIPELINE** is functionally end-to-end for **OFFLINE/CONTROLLED V1**:
-
-upstream case/research/compliance/Lead → vetted research enrichment → existing Lead → explicit offline skip trace → candidate gating → Contact.
+**Holy Grail CORE PIPELINE** is functionally end-to-end for **OFFLINE/CONTROLLED V1**.
 
 That claim does **not** mean live people-search, outreach automation, CRM/Airtable, dashboard, or production deployment are complete.
+
+---
+
+## PRODUCTIZATION
+
+**Productization has started. The product is NOT yet deployed or productionized.**
+
+### P1 — Application / API foundation (this increment)
+
+Local-only FastAPI read shell under `surplus_ai/api/`.
+
+- Entry: `surplus_ai.api.app:app`
+- Start: `.\.venv\Scripts\python.exe -m uvicorn surplus_ai.api.app:app --host 127.0.0.1 --port 8000`
+- Optional deps: `pip install -e ".[dev,api]"` (`fastapi`, plain `uvicorn` — not `[standard]`)
+- OpenAPI (local): `http://127.0.0.1:8000/docs`
+
+**UNAUTHENTICATED P1 API MUST NOT BE INTERNET-FACING.** Default bind is `127.0.0.1` only. No auth, no wildcard CORS, no cloud deploy in P1.
+
+Read-only routes: `/health`, `/api/v1/status`, cases/leads/research reviews/contacts list+detail. Contact responses omit `Contact.value`. Review responses omit research payloads. No write endpoints; no research/skip-trace/outreach invocation.
+
+**Not in P1:** dashboard UI, Airtable, agents/LLMs, live skip-trace, public deployment, authentication.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 
 Do not make live government API or people-search requests in this task. Do not treat empty compliance YAML as a reason to bypass the fail-closed gate.
+
+---
+
+## Phase 6 core (COMPLETE FOR OFFLINE/CORE V1)
+
+**Phase 6F-A:** Contact dedupe concurrency hardening — unique constraint `uq_contacts_lead_contact_type_value` on `(lead_id, contact_type, value)` plus nested-savepoint IntegrityError race recovery in `materialize_contact_candidate`.
+
+**Phase 6F-B:** Explicit Lead-bound offline orchestration — `run_skip_trace_for_lead(session, lead_id=..., provider=...)` invokes one supplied offline provider once, then routes eligible candidates through Phase 6F-A materialization. Lead gate runs before provider invocation. No automatic Lead-create hook.
 
 ---
 

@@ -42,6 +42,10 @@ dev = [
     "types-PyYAML",
     "types-python-dateutil",
 ]
+api = [
+    "fastapi>=0.141.1,<0.142",
+    "uvicorn>=0.52.3,<0.53",
+]
 
 [tool.setuptools.packages.find]
 include = ["surplus_ai*"]
@@ -62,6 +66,8 @@ select = ["E", "F", "I", "UP", "B"]
 "surplus_ai/database/migrations/versions/*.py" = ["E501"]
 # typer.Argument/Option in defaults is how Typer declares CLI parameters.
 "surplus_ai/cli/**/*.py" = ["B008"]
+# FastAPI Depends()/Query() in defaults is the framework DI pattern.
+"surplus_ai/api/**/*.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
