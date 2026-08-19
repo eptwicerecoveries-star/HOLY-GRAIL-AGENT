@@ -11,7 +11,9 @@ P4 is split. This document describes **P4-A only**.
 | P4-A | **COMPLETE** |
 | P4-B | **IN PROGRESS** |
 | P4-B1 | ORIGIN + TRUSTED HOST PRODUCTION CONFIG IMPLEMENTED/TESTED |
-| P4-B2 | **NOT STARTED** |
+| P4-B2 | **IN PROGRESS** |
+| P4-B2-A | THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED |
+| P4-B2-B | **NOT STARTED** |
 | P4-B3 | **NOT STARTED** |
 | P4-C | **NOT STARTED** |
 
@@ -84,7 +86,7 @@ Explicit one-shot:
 docker compose --profile migrate run --rm migrate
 ```
 
-That runs existing `surplusai db migrate` (upgrade to head). It is idempotent if already at `d4c8a1b9e703`.
+That runs existing `surplusai db migrate` (upgrade to head). It is idempotent if already at `e1f4a8c92b03`.
 
 ## Restart and logs
 
@@ -122,17 +124,28 @@ Auth POST Origin checks (login/logout only) use exact membership in the Settings
 
 Starlette `TrustedHostMiddleware` (`www_redirect=False`) uses the validated host list. Invalid Host is Starlette's 400. Middleware order: TrustedHost → dashboard security headers → routes.
 
-**P4-B1 does not authorize internet exposure.** Still required: P4-B2 login throttling (design not locked), P4-B3 HSTS/readiness/TLS contract, TLS edge, private production DB, real credentials, automatic backups, proxy trust, security review.
+**P4-B1 does not authorize internet exposure.** Still required: P4-B2-B login HTTP throttling integration, P4-B3 HSTS/readiness/TLS contract, TLS edge, private production DB, real credentials, automatic backups, proxy trust, security review.
 
-## P4-B2 / P4-B3 (later)
+## P4-B2-A — Throttle foundation (no HTTP integration)
 
-- P4-B2: login throttling (separate design approval; not started)
+PostgreSQL table `login_throttle_buckets` stores digest-only keys for two scopes:
+
+- `ip` — login **attempt** gate (20 / 15 min; counts all origin-valid attempts including successes)
+- `credential` — failed verification counter (5 / 15 min; IP + exact submitted email)
+
+Service module: `surplus_ai/auth/login_throttle.py`. Caller-owned commits. B2-A does **not** wire the login route; HTTP behavior remains P4-B1 until P4-B2-B.
+
+Logical per-key expiry/reset on use. Stale physical rows may remain until explicit P4-C maintenance if production policy requires physical cleanup.
+
+## P4-B2-B / P4-B3 (later)
+
+- P4-B2-B: login route integration (429, Retry-After, pre-Argon2 IP commit)
 - P4-B3: security-header / TLS contract / optional `/ready`
 
 Do not expose the app beyond loopback before P4-B is complete and reviewed.
 
 ## P4-C (later, separately approved)
 
-Hosting provider/account, managed database, domain/TLS, automatic backups, real deployment.
+Hosting provider/account, managed database, domain/TLS, automatic backups, real deployment, and physical stale `login_throttle_buckets` row cleanup/maintenance if production policy requires it (B2-A uses logical per-key expiry only; stale digest rows may remain).
 
 Preferred eventual architecture: managed app/container + managed PostgreSQL. Fallback: single VPS + Docker Compose + Caddy.

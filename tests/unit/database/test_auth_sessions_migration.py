@@ -27,7 +27,7 @@ _UNIQUE = "uq_auth_sessions_token_digest"
 def test_p3b1_migration_revises_single_current_head() -> None:
     assert down_revision == _PREV
     assert revision == "d4c8a1b9e703"
-    assert head_revision() == revision
+    assert head_revision() == "e1f4a8c92b03"
 
 
 @pytest.fixture
@@ -138,11 +138,17 @@ def test_p3b1_auth_sessions_migration_lifecycle(
         ).scalar_one()
     assert hash_col == "YES"
 
-    down = _alembic(["downgrade", "-1"], cli_env)
-    assert down.returncode == 0, down.stderr
+    down_b2 = _alembic(["downgrade", "-1"], cli_env)
+    assert down_b2.returncode == 0, down_b2.stderr
+    assert "login_throttle_buckets" not in _table_names(migration_db)
+    assert _TABLE in _table_names(migration_db)
+
+    down_b1 = _alembic(["downgrade", "-1"], cli_env)
+    assert down_b1.returncode == 0, down_b1.stderr
     assert _TABLE not in _table_names(migration_db)
     assert "password_hash" in {c["name"] for c in inspect(migration_db).get_columns("users")}
 
     up_again = _alembic(["upgrade", "head"], cli_env)
     assert up_again.returncode == 0, up_again.stderr
     assert _TABLE in _table_names(migration_db)
+    assert "login_throttle_buckets" in _table_names(migration_db)

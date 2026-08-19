@@ -12,6 +12,7 @@ from surplus_ai.database.models.ingestion_job import IngestionJob
 from surplus_ai.database.models.interaction import Interaction
 from surplus_ai.database.models.lead import Lead
 from surplus_ai.database.models.lead_score import LeadScore
+from surplus_ai.database.models.login_throttle_bucket import LoginThrottleBucket
 from surplus_ai.database.models.owner import Owner
 from surplus_ai.database.models.parse_review_item import ParseReviewItem
 from surplus_ai.database.models.parsed_document import ParsedDocument
@@ -39,6 +40,7 @@ __all__ = [
     "Interaction",
     "Lead",
     "LeadScore",
+    "LoginThrottleBucket",
     "Owner",
     "ParseReviewItem",
     "ParsedDocument",

@@ -29,7 +29,7 @@ def test_phase6f_a_migration_revises_single_current_head() -> None:
     assert down_revision == _PREV
     assert revision == "f3a8d12e90b1"
     # Head advanced by later revisions; 6F-A remains an ancestor, not the current head.
-    assert head_revision() == "d4c8a1b9e703"
+    assert head_revision() == "e1f4a8c92b03"
 
 
 @pytest.fixture
