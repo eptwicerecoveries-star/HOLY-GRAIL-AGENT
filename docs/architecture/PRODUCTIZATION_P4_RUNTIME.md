@@ -14,7 +14,7 @@ P4 is split. This document describes **P4-A only**.
 | P4-B2 | **COMPLETE** |
 | P4-B2-A | THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED |
 | P4-B2-B | LOGIN HTTP THROTTLE INTEGRATION IMPLEMENTED/TESTED |
-| P4-B3 | **NOT STARTED** |
+| P4-B3 | SECURITY HEADERS / READINESS / TLS CONTRACT IMPLEMENTED AND TESTED |
 | P4-C | **NOT STARTED** |
 
 P4-A is **not** production deployed, internet-ready, TLS-enabled, or cloud-hosted.
@@ -161,14 +161,42 @@ Throttle applies only to `POST /api/v1/auth/login`. No throttle on `/auth/me`, `
 
 **P4-B2-B does not authorize internet exposure.** Still required: P4-B3 HSTS/readiness/TLS contract, TLS edge, private production DB, real credentials, automatic backups, proxy trust, security review.
 
-## P4-B3 (later)
+## P4-B3 — Security headers, readiness, and TLS contract
 
-- Security-header / TLS contract / optional `/ready`
+Browser-facing Holy Grail UI responses (`/`, `GET /login`, `/static/*`) send:
 
-Do not expose the app beyond loopback before P4-B is complete and reviewed.
+- `Content-Security-Policy` — existing directives preserved, plus `frame-ancestors 'none'`
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+
+No `'unsafe-inline'`, `'unsafe-eval'`, wildcard script origins, or CORS.
+
+**Production HSTS:** when `SURPLUS_AI_ENV=prod`, responses that pass TrustedHost and reach the security-header middleware include `Strict-Transport-Security: max-age=31536000`. Authority is `Settings.env` only — never `request.url.scheme`, `X-Forwarded-Proto`, or `Forwarded`. Dev/test emit no HSTS. No `includeSubDomains` / `preload` yet. No in-app HTTPS redirect middleware.
+
+**`GET /ready`:** unauthenticated database connectivity check (`SELECT 1`). Success `200 {"status":"ready"}`. Failure `503 {"status":"not_ready"}` with no DB URL, credentials, or exception details. Does not check Alembic head, providers, or external services. Distinct from `GET /health` (liveness only; no PostgreSQL).
+
+TrustedHost and Origin validation remain unchanged. Forwarded headers remain untrusted. Login throttling still uses `request.client.host` only. HTTPException header passthrough (Retry-After) is preserved.
+
+### Production TLS / reverse-proxy contract (documentation only)
+
+P4-B3 does **not** terminate public TLS inside the ASGI app and does **not** provision certificates or reverse-proxy infrastructure.
+
+Production deployment must:
+
+- place the app behind a TLS-terminating edge / reverse proxy
+- redirect public HTTP → HTTPS at that edge (not inside the app)
+- keep the app private behind the edge (not bound for public/LAN exposure from P4-B3)
+- rely on production `Settings.env` for app-emitted HSTS and Secure session cookies
+- **not** treat request scheme or forwarded proto as HSTS authority
+
+Forwarded headers are **not** trusted in P4-B3. P4-C must configure trusted proxy addresses explicitly and must never blindly trust all forwarded-header sources. TLS certificate/domain provisioning is outside P4-B3. **No public exposure is authorized yet.**
 
 ## P4-C (later, separately approved)
 
-Hosting provider/account, managed database, domain/TLS, automatic backups, real deployment, and physical stale `login_throttle_buckets` row cleanup/maintenance if production policy requires it (B2-A uses logical per-key expiry only; stale digest rows may remain).
+Hosting provider/account, managed/private production PostgreSQL, domain, TLS certificate provisioning, TLS reverse proxy / load balancer, HTTP → HTTPS redirect at the edge, explicit trusted-proxy configuration, production secrets, managed DB/network rules, automatic backups, production migrations/bootstrap, deployment/runbook, production operator creation, and physical stale `login_throttle_buckets` row cleanup/maintenance if production policy requires it (B2-A uses logical per-key expiry only; stale digest rows may remain).
 
 Preferred eventual architecture: managed app/container + managed PostgreSQL. Fallback: single VPS + Docker Compose + Caddy.
+
+**P4-B3 does not authorize internet exposure.** Holy Grail remains loopback-only until P4-C is separately completed and reviewed.

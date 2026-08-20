@@ -29,13 +29,23 @@ from surplus_ai.api.routes import (
     reviews,
     status,
 )
-from surplus_ai.api.static import DASHBOARD_SECURITY_HEADERS, STATIC_DIR
+from surplus_ai.api.static import (
+    DASHBOARD_SECURITY_HEADERS,
+    HSTS_HEADER_VALUE,
+    STATIC_DIR,
+)
 from surplus_ai.utils.config import get_settings
 from surplus_ai.utils.logging_config import configure_logging
 
 
 class DashboardSecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Attach conservative headers to dashboard HTML and static assets only."""
+    """Browser CSP/frame headers on UI paths; production HSTS on app responses.
+
+    CSP / X-Frame-Options / related headers apply only to ``/``, ``/login``, and
+    ``/static/*``. Production HSTS uses ``Settings.env == "prod"`` only — never
+    request scheme or forwarded proto. Invalid Host is rejected by
+    TrustedHostMiddleware before this middleware runs.
+    """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -45,6 +55,10 @@ class DashboardSecurityHeadersMiddleware(BaseHTTPMiddleware):
         if path in {"/", "/login"} or path.startswith("/static/"):
             for key, value in DASHBOARD_SECURITY_HEADERS.items():
                 response.headers.setdefault(key, value)
+        if get_settings().env == "prod":
+            response.headers.setdefault(
+                "Strict-Transport-Security", HSTS_HEADER_VALUE
+            )
         return response
 
 

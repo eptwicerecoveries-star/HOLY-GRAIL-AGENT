@@ -13,6 +13,10 @@ class HealthResponse(BaseModel):
     status: str = "ok"
 
 
+class ReadyResponse(BaseModel):
+    status: str = "ready"
+
+
 class StatusResponse(BaseModel):
     application: str
     version: str

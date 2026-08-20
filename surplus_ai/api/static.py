@@ -11,6 +11,8 @@ LOGIN_HTML = STATIC_DIR / "login.html"
 DASHBOARD_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Content-Security-Policy": (
         "default-src 'self'; "
         "script-src 'self'; "
@@ -20,6 +22,10 @@ DASHBOARD_SECURITY_HEADERS = {
         "font-src 'self'; "
         "object-src 'none'; "
         "base-uri 'self'; "
-        "form-action 'none'"
+        "form-action 'none'; "
+        "frame-ancestors 'none'"
     ),
 }
+
+# Production-only; authority is Settings.env, never request scheme / forwarded proto.
+HSTS_HEADER_VALUE = "max-age=31536000"
