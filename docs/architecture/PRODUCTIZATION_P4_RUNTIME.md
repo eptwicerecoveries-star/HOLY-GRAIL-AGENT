@@ -11,9 +11,9 @@ P4 is split. This document describes **P4-A only**.
 | P4-A | **COMPLETE** |
 | P4-B | **IN PROGRESS** |
 | P4-B1 | ORIGIN + TRUSTED HOST PRODUCTION CONFIG IMPLEMENTED/TESTED |
-| P4-B2 | **IN PROGRESS** |
+| P4-B2 | **COMPLETE** |
 | P4-B2-A | THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED |
-| P4-B2-B | **NOT STARTED** |
+| P4-B2-B | LOGIN HTTP THROTTLE INTEGRATION IMPLEMENTED/TESTED |
 | P4-B3 | **NOT STARTED** |
 | P4-C | **NOT STARTED** |
 
@@ -137,10 +137,33 @@ Service module: `surplus_ai/auth/login_throttle.py`. Caller-owned commits. B2-A 
 
 Logical per-key expiry/reset on use. Stale physical rows may remain until explicit P4-C maintenance if production policy requires physical cleanup.
 
-## P4-B2-B / P4-B3 (later)
+## P4-B2-B — Login HTTP throttle integration
 
-- P4-B2-B: login route integration (429, Retry-After, pre-Argon2 IP commit)
-- P4-B3: security-header / TLS contract / optional `/ready`
+`POST /api/v1/auth/login` integrates the B2-A throttle service:
+
+1. Origin validation (unchanged; wrong/missing Origin → 403, zero throttle state)
+2. Canonical peer IP from `request.client.host` only (no forwarded headers)
+3. `consume_ip_login_attempt` — atomic IP attempt gate
+4. **COMMIT #1** — releases row locks before expensive password hashing; makes IP budget visible to concurrent requests
+5. IP decision — blocked → 429 `login_throttled` with `Retry-After`; skips User lookup and Argon2
+6. `precheck_credential_throttle` — read-only credential check; blocked → 429
+7. User lookup + Argon2 verification (or dummy Argon2 for unknown users)
+8. Invalid credentials → `record_credential_failure` + **COMMIT #2A** + 401
+9. Valid credentials → `clear_credential_bucket_on_success` + `create_auth_session` + **COMMIT #2B** + Set-Cookie
+
+IP gate: 20 origin-valid login attempts / 15 min. Credential gate: 5 failures / 15 min per IP+email. Blocks: 15 min. Successful login clears credential bucket only; IP bucket persists (no email-only global lockout). No raw IP/email in throttle table. `unknown-client` sentinel for missing/invalid peer host; no throttle bypass.
+
+Failure states (unknown email, wrong password, inactive user, NULL hash) all record credential failure and return identical 401. DB/commit failures fail closed (500, no cookie, no session).
+
+429 JSON envelope: `{"code": "login_throttled", "message": "Too many login attempts. Try again later."}` with `Retry-After` header (positive integer seconds). No identifying information exposed.
+
+Throttle applies only to `POST /api/v1/auth/login`. No throttle on `/auth/me`, `/auth/logout`, health, status, dashboard, or other routes. No global rate limiter middleware.
+
+**P4-B2-B does not authorize internet exposure.** Still required: P4-B3 HSTS/readiness/TLS contract, TLS edge, private production DB, real credentials, automatic backups, proxy trust, security review.
+
+## P4-B3 (later)
+
+- Security-header / TLS contract / optional `/ready`
 
 Do not expose the app beyond loopback before P4-B is complete and reviewed.
 

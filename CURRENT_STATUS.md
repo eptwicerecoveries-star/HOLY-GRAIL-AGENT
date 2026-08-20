@@ -17,7 +17,7 @@ AI DEVELOPMENT RULE: Read `PROJECT.md`, `ARCHITECTURE.md`, `AI_DEVELOPER_GUIDE.m
 | 3 | Owner classifier | **Implemented** | Rule-based owner typing; pursuable types are config-driven. See `docs/architecture/PHASE3_CLASSIFIER_DESIGN.md`. |
 | 4 | Compliance framework | **Implemented (engine only)** | Engine and YAML loaders exist and are fail-closed. Statutory values for shipped states are **not** recorded. See below and `docs/architecture/PHASE4_COMPLIANCE_DESIGN.md`. |
 | 5 | Lead creation | **Implemented** | Counties, cases, properties, owners, compliance evaluations, and leads; promotion path when a state is brought online. See `docs/architecture/PHASE5_LEAD_DESIGN.md`. |
-| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** COMPLETE FOR LOCAL AUTHENTICATED V1. **P4-A:** COMPLETE. **P4-B:** IN PROGRESS (**P4-B1** COMPLETE; **P4-B2-A** throttle foundation; **P4-B2-B/P4-B3** NOT STARTED). **P4-C:** NOT STARTED. Still **127.0.0.1** only — **NOT** internet-ready. |
+| 6 | Research & Enrichment | **6A–6E COMPLETE; Phase 6F COMPLETE FOR OFFLINE/CORE V1** | Core research/enrichment/skip-trace offline path complete. **P1:** COMPLETE. **P2:** COMPLETE FOR LOCAL READ-ONLY V1. **P3:** COMPLETE FOR LOCAL AUTHENTICATED V1. **P4-A:** COMPLETE. **P4-B:** IN PROGRESS (**P4-B1** COMPLETE; **P4-B2** COMPLETE — B2-A throttle foundation + B2-B login HTTP integration; **P4-B3** NOT STARTED). **P4-C:** NOT STARTED. Still **127.0.0.1** only — **NOT** internet-ready. |
 
 **Not implemented (do not treat as present):** production-enabled live government endpoints, ongoing production ArcGIS automation, an official live generic REST candidate, **live skip-trace / people-search vendors**, scoring CRM automation, Airtable sync, pipeline orchestration, dashboard. Offline Lead-gated Contact materialization exists (Phase 6F V1). One controlled NYC PLUTO Socrata lookup was live-validated on 2026-08-15; `nyc_dcp_pluto` remains disabled and is not selected by any county. A generic offline ArcGIS FeatureServer adapter exists. Disabled fake `example_arcgis` remains. Disabled official Franklin County candidate `franklin_county_oh_auditor_parcels` remains configured, not live-validated, and is not selected by any county. One controlled Lake County ArcGIS happy-path lookup was live-validated on 2026-08-16; `lake_county_fl_pa_tax_parcels` was restored disabled and is not selected by any county. A generic offline REST JSON adapter exists; disabled fake `example_rest_json` only; no official REST candidate configured or live-tested.
 
@@ -135,11 +135,11 @@ See `docs/architecture/PRODUCTIZATION_P4_RUNTIME.md`.
 
 **P4-B1 (this increment):** ORIGIN + TRUSTED HOST PRODUCTION CONFIG IMPLEMENTED/TESTED — `SURPLUS_AI_AUTH_ORIGINS` and `SURPLUS_AI_ALLOWED_HOSTS`, fail-closed prod Settings, Starlette TrustedHostMiddleware. Local Compose stays `SURPLUS_AI_ENV=dev` and does **not** require those variables.
 
-**P4-B2:** IN PROGRESS.
+**P4-B2:** COMPLETE.
 
-**P4-B2-A (this increment):** THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED — `login_throttle_buckets` table + `surplus_ai/auth/login_throttle.py` service (IP attempt gate + credential failure buckets). **Does not change HTTP login behavior.** No 429/Retry-After until P4-B2-B.
+**P4-B2-A:** THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED — `login_throttle_buckets` table + `surplus_ai/auth/login_throttle.py` service (IP attempt gate + credential failure buckets).
 
-**P4-B2-B:** NOT STARTED (login route HTTP integration).
+**P4-B2-B:** LOGIN HTTP THROTTLE INTEGRATION IMPLEMENTED AND TESTED — `POST /api/v1/auth/login` integrates B2-A throttle service. IP gate: 20 origin-valid login attempts / 15 minutes. Credential gate: 5 failures / 15 minutes per IP+email. Temporary blocks: 15 minutes. Successful login clears credential bucket only; IP bucket persists. No email-only global lockout. No raw IP/email in throttle table. Forwarded headers remain untrusted (`request.client.host` only). HTTP 429 with `Retry-After` header and `login_throttled` JSON envelope. Mandatory pre-Argon2 COMMIT #1 releases row locks before expensive password hashing. Blocked requests skip User lookup and Argon2. B2-B does **not** authorize internet exposure.
 
 **P4-B3:** NOT STARTED (HSTS / TLS contract / `/ready`).
 
@@ -160,7 +160,7 @@ URL: `http://127.0.0.1:8000`. First user: `docker compose exec app surplusai use
 
 **Do not** run `docker compose down -v` unless intentionally deleting local database/log volumes.
 
-Still localhost-only. No TLS, reverse proxy, login rate limiting, production backups, managed production DB, cloud runtime, workers, or business writes. CSRF design remains required before cookie-authenticated business writes. Providers remain disabled/manual. No live skip-trace. P4-B1 Origin/Host config is **not** public exposure.
+Still localhost-only. No TLS, reverse proxy, production backups, managed production DB, cloud runtime, workers, or business writes. CSRF design remains required before cookie-authenticated business writes. Providers remain disabled/manual. No live skip-trace. P4-B1 Origin/Host config is **not** public exposure. P4-B2 login rate limiting is now active but does **not** authorize internet exposure.
 
 **Live skip-trace vendor / credentials / terms:** NOT STARTED.
 

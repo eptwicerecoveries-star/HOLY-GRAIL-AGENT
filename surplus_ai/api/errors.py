@@ -29,7 +29,10 @@ async def http_exception_handler(
         body = error_body(code=code, message=detail)
     else:
         body = error_body(code="http_error", message="Request failed")
-    return JSONResponse(status_code=http_exc.status_code, content=body)
+    headers = getattr(http_exc, "headers", None) or {}
+    return JSONResponse(
+        status_code=http_exc.status_code, content=body, headers=headers
+    )
 
 
 async def validation_exception_handler(
@@ -82,4 +85,18 @@ def authentication_failed() -> StarletteHTTPException:
                 message="Invalid email or password.",
             ),
         ),
+    )
+
+
+def login_throttled(retry_after_seconds: int) -> StarletteHTTPException:
+    return StarletteHTTPException(
+        status_code=429,
+        detail=cast(
+            Any,
+            error_body(
+                code="login_throttled",
+                message="Too many login attempts. Try again later.",
+            ),
+        ),
+        headers={"Retry-After": str(max(1, retry_after_seconds))},
     )
