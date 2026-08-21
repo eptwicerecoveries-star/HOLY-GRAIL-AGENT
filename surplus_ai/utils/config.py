@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
@@ -109,6 +110,38 @@ def _resolve_allowed_hosts(
     return tuple(_validate_allowed_host(token, env=env) for token in _csv_tokens(raw))
 
 
+def _validate_forwarded_allow_ip(token: str) -> str:
+    """Accept only literal IP addresses or CIDR networks (Uvicorn 0.52.3-compatible).
+
+    Rejects ``*`` and non-IP hostnames. Uvicorn would otherwise treat malformed
+    entries as opaque literals; Holy Grail fails closed instead.
+    """
+    if token == "*":
+        raise ValueError("wildcard forwarded allow IPs are not permitted")
+    if "/" in token:
+        try:
+            return str(ipaddress.ip_network(token, strict=False))
+        except ValueError as exc:
+            raise ValueError(f"invalid trusted proxy network: {token}") from exc
+    try:
+        return str(ipaddress.ip_address(token))
+    except ValueError as exc:
+        raise ValueError(f"invalid trusted proxy address: {token}") from exc
+
+
+def _resolve_forwarded_allow_ips(
+    raw: str | None, *, trust_proxy_headers: bool
+) -> tuple[str, ...]:
+    if not trust_proxy_headers:
+        return ()
+    if raw is None or raw.strip() == "":
+        raise ValueError(
+            "SURPLUS_AI_FORWARDED_ALLOW_IPS is required when "
+            "SURPLUS_AI_TRUST_PROXY_HEADERS is true"
+        )
+    return tuple(_validate_forwarded_allow_ip(token) for token in _csv_tokens(raw))
+
+
 class Settings(BaseSettings):
     """Layered application configuration: env vars (SURPLUS_AI_*) override .env."""
 
@@ -126,9 +159,14 @@ class Settings(BaseSettings):
     # Raw comma-separated strings. Stored as str so pydantic-settings does not JSON-decode.
     auth_origins: str | None = None
     allowed_hosts: str | None = None
+    # Proxy trust is off by default. Uvicorn defaults proxy_headers=True; our
+    # runtime launcher disables it unless these settings explicitly enable trust.
+    trust_proxy_headers: bool = False
+    forwarded_allow_ips: str | None = None
 
     _auth_origin_allowlist: tuple[str, ...] = PrivateAttr(default=())
     _allowed_host_allowlist: tuple[str, ...] = PrivateAttr(default=())
+    _forwarded_allow_ip_allowlist: tuple[str, ...] = PrivateAttr(default=())
 
     @field_validator("database_url")
     @classmethod
@@ -142,6 +180,10 @@ class Settings(BaseSettings):
     def _validate_deployment_contract(self) -> Self:
         self._auth_origin_allowlist = _resolve_auth_origins(self.auth_origins, env=self.env)
         self._allowed_host_allowlist = _resolve_allowed_hosts(self.allowed_hosts, env=self.env)
+        self._forwarded_allow_ip_allowlist = _resolve_forwarded_allow_ips(
+            self.forwarded_allow_ips,
+            trust_proxy_headers=self.trust_proxy_headers,
+        )
         return self
 
     @property
@@ -151,6 +193,10 @@ class Settings(BaseSettings):
     @property
     def allowed_host_allowlist(self) -> tuple[str, ...]:
         return self._allowed_host_allowlist
+
+    @property
+    def forwarded_allow_ip_allowlist(self) -> tuple[str, ...]:
+        return self._forwarded_allow_ip_allowlist
 
 
 @lru_cache(maxsize=1)

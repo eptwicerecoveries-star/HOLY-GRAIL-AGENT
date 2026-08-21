@@ -9,13 +9,18 @@ P4 is split. This document describes **P4-A only**.
 | P3 | **COMPLETE FOR LOCAL AUTHENTICATED V1** |
 | P4 | **IN PROGRESS** |
 | P4-A | **COMPLETE** |
-| P4-B | **IN PROGRESS** |
+| P4-B | **COMPLETE** |
 | P4-B1 | ORIGIN + TRUSTED HOST PRODUCTION CONFIG IMPLEMENTED/TESTED |
 | P4-B2 | **COMPLETE** |
 | P4-B2-A | THROTTLE DATA/SERVICE FOUNDATION IMPLEMENTED/TESTED |
 | P4-B2-B | LOGIN HTTP THROTTLE INTEGRATION IMPLEMENTED/TESTED |
 | P4-B3 | SECURITY HEADERS / READINESS / TLS CONTRACT IMPLEMENTED AND TESTED |
-| P4-C | **NOT STARTED** |
+| P4-C | **IN PROGRESS** |
+| P4-C1 | REPOSITORY PRODUCTION RUNTIME FOUNDATION IMPLEMENTED AND TESTED |
+| P4-C2 | NOT STARTED |
+| P4-C3 | NOT STARTED |
+| P4-C4 | NOT STARTED |
+| P4-C5 | NOT STARTED |
 
 P4-A is **not** production deployed, internet-ready, TLS-enabled, or cloud-hosted.
 
@@ -78,7 +83,8 @@ Host-side CLI against the same loopback Postgres still works with the existing `
 
 ## Migrations
 
-The long-running `app` command is **only** Uvicorn. It does **not** run Alembic.
+The long-running `app` command is **only** the Holy Grail runtime launcher
+(`python -m surplus_ai.api.runtime`). It does **not** run Alembic.
 
 Explicit one-shot:
 
@@ -96,9 +102,8 @@ File logs go to named volume `surplus_ai_logs` (`SURPLUS_AI_LOG_DIR=/app/logs`).
 
 ## What P4-A does not include
 
-- TLS / reverse proxy / forwarded headers
-- Login rate limiting
-- Production backups / managed PostgreSQL
+- TLS / domain / public reverse proxy (P4-C2/C3)
+- Production backups / managed PostgreSQL (P4-C2/C5)
 - Cloud accounts, domains, public bind
 - Workers / schedulers
 - Business write HTTP APIs
@@ -106,6 +111,7 @@ File logs go to named volume `surplus_ai_logs` (`SURPLUS_AI_LOG_DIR=/app/logs`).
 - Live research providers or skip-trace vendors
 
 P4-B1 adds configurable Origin/Host **settings** only. It does **not** authorize non-loopback bind.
+P4-C1 adds repository proxy-trust settings and an explicit Uvicorn launcher. It does **not** enable trust in local Compose and does **not** authorize internet exposure.
 
 ## P4-B1 — Origin and Trusted Host
 
@@ -177,7 +183,7 @@ No `'unsafe-inline'`, `'unsafe-eval'`, wildcard script origins, or CORS.
 
 **`GET /ready`:** unauthenticated database connectivity check (`SELECT 1`). Success `200 {"status":"ready"}`. Failure `503 {"status":"not_ready"}` with no DB URL, credentials, or exception details. Does not check Alembic head, providers, or external services. Distinct from `GET /health` (liveness only; no PostgreSQL).
 
-TrustedHost and Origin validation remain unchanged. Forwarded headers remain untrusted. Login throttling still uses `request.client.host` only. HTTPException header passthrough (Retry-After) is preserved.
+TrustedHost and Origin validation remain unchanged. Login throttling still uses `request.client.host` only. HTTPException header passthrough (Retry-After) is preserved.
 
 ### Production TLS / reverse-proxy contract (documentation only)
 
@@ -191,12 +197,92 @@ Production deployment must:
 - rely on production `Settings.env` for app-emitted HSTS and Secure session cookies
 - **not** treat request scheme or forwarded proto as HSTS authority
 
-Forwarded headers are **not** trusted in P4-B3. P4-C must configure trusted proxy addresses explicitly and must never blindly trust all forwarded-header sources. TLS certificate/domain provisioning is outside P4-B3. **No public exposure is authorized yet.**
+Raw forwarded headers are **untrusted** unless the immediate peer is on an explicit allowlist (P4-C1 foundation; P4-C3 supplies the real allowlist after the hosting edge is known). TLS certificate/domain provisioning is outside P4-B3. **No public exposure is authorized yet.**
 
-## P4-C (later, separately approved)
+## P4-C1 — Repository production runtime foundation
 
-Hosting provider/account, managed/private production PostgreSQL, domain, TLS certificate provisioning, TLS reverse proxy / load balancer, HTTP → HTTPS redirect at the edge, explicit trusted-proxy configuration, production secrets, managed DB/network rules, automatic backups, production migrations/bootstrap, deployment/runbook, production operator creation, and physical stale `login_throttle_buckets` row cleanup/maintenance if production policy requires it (B2-A uses logical per-key expiry only; stale digest rows may remain).
+Repository-only. No cloud account, managed DB, domain, DNS, TLS certificate, public deployment, production user, or real secrets.
 
-Preferred eventual architecture: managed app/container + managed PostgreSQL. Fallback: single VPS + Docker Compose + Caddy.
+### Proxy trust (Uvicorn 0.52.3)
 
-**P4-B3 does not authorize internet exposure.** Holy Grail remains loopback-only until P4-C is separately completed and reviewed.
+Installed Uvicorn defaults `proxy_headers=True` and trusts `127.0.0.1` when `forwarded_allow_ips` is unset. Holy Grail **must not** rely on those defaults.
+
+| Setting | Env | Default | Rules |
+|---------|-----|---------|-------|
+| `trust_proxy_headers` | `SURPLUS_AI_TRUST_PROXY_HEADERS` | `false` | Explicit enable only |
+| `forwarded_allow_ips` | `SURPLUS_AI_FORWARDED_ALLOW_IPS` | unset | Required non-empty when trust is true |
+
+When trust is false: runtime launches with `proxy_headers=False`; forwarded headers are ignored; `request.client.host` remains the immediate peer.
+
+When trust is true: allowlist must be explicit, validated (exact IPs and/or CIDRs via stdlib `ipaddress`), and free of `*`. Missing/blank/malformed allowlists fail Settings load closed. No automatic localhost trust in production. No “trust everyone” mode.
+
+Uvicorn honors `X-Forwarded-For` **only** when the immediate `scope["client"]` host is trusted. It reverse-walks the XFF chain and selects the first untrusted hop as the client. Login (`auth.py`) and `login_throttle.py` do **not** parse XFF; they continue to use `canonical_client_ip(request.client.host)`.
+
+### Production launcher
+
+`python -m surplus_ai.api.runtime` → `uvicorn.run` with:
+
+- host `0.0.0.0` (inside container only)
+- port `8000`
+- workers `1`
+- reload `false`
+- `proxy_headers` / `forwarded_allow_ips` taken **only** from validated Settings
+
+Dockerfile `CMD` uses this launcher. Local Compose keeps `127.0.0.1:8000:8000`, `SURPLUS_AI_ENV=dev`, and proxy trust **disabled**.
+
+### Production env template
+
+`deploy/production.env.example` — placeholders only; proxy trust left `false`. P4-C3 fills the real allowlist after the edge identity is known.
+
+### Future deployment order (C2+)
+
+1. Choose/provision hosting + managed private PostgreSQL (C2)
+2. Inject production secrets from the provider secret store
+3. Build immutable image tagged by git SHA/version
+4. Configure domain/TLS edge (C3)
+5. Obtain exact trusted proxy identity/ranges from the platform
+6. Enable proxy trust with that explicit allowlist (never `*`)
+7. Configure exact `SURPLUS_AI_ALLOWED_HOSTS`
+8. Configure exact HTTPS `SURPLUS_AI_AUTH_ORIGINS`
+9. Backup/snapshot the database
+10. Run one-shot: `surplusai db migrate`
+11. Verify migration head (`e1f4a8c92b03` until a later approved revision)
+12. Start/update the web app
+13. Verify `/health`
+14. Verify `/ready`
+15. Create the first production operator interactively (C4)
+16. Validate login/logout/security behavior
+17. Enable/verify backups and restore procedure (C5)
+18. Complete the security checklist
+19. Receive explicit go-public approval
+
+**No blind Alembic downgrade rollback.**
+
+### Production safety (C1 documentation)
+
+- `SURPLUS_AI_ENV=prod` is mandatory for production
+- Real `DATABASE_URL` comes from the provider secret store
+- `AUTH_ORIGINS` exact HTTPS only; `ALLOWED_HOSTS` exact hostnames only
+- Proxy trust disabled unless explicitly configured; `*` forbidden
+- Raw forwarded headers untrusted unless the immediate proxy is allowlisted
+- App remains private behind the TLS edge; PostgreSQL remains private
+- Public TLS / HTTP→HTTPS redirect is an edge responsibility
+- HSTS and Secure cookies are generated from `env=prod`
+- No secrets in Git, image, or example files
+- Stdout is the primary production log sink; filesystem logs are not durable business storage
+- One Uvicorn worker initially; no background worker required for dashboard/API
+
+## P4-C2–C5 (later, separately approved)
+
+| Increment | Scope |
+|-----------|--------|
+| P4-C2 | Hosting account + managed private PostgreSQL |
+| P4-C3 | Domain, TLS edge, exact trusted-proxy allowlist |
+| P4-C4 | First production operator (interactive) |
+| P4-C5 | Backups / restore procedure |
+
+Also later if required: physical stale `login_throttle_buckets` row cleanup (B2-A uses logical per-key expiry only).
+
+Preferred architecture: managed app/container + managed PostgreSQL. Do **not** add a generic `compose.prod.yml` that encourages unsafe self-hosting.
+
+**P4-C1 does not authorize internet exposure.** Holy Grail remains loopback-only until later C increments are separately completed and reviewed.

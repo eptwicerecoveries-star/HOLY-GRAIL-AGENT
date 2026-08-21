@@ -22,4 +22,6 @@ USER surplus
 
 EXPOSE 8000
 
-CMD ["python", "-m", "uvicorn", "surplus_ai.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Explicit launcher: proxy_headers off unless SURPLUS_AI_TRUST_PROXY_HEADERS=true
+# with a validated SURPLUS_AI_FORWARDED_ALLOW_IPS allowlist (never Uvicorn defaults).
+CMD ["python", "-m", "surplus_ai.api.runtime"]
