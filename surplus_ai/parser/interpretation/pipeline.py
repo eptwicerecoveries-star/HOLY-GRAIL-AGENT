@@ -18,7 +18,11 @@ from surplus_ai.parser.interpretation.models import (
     SurplusSource,
 )
 from surplus_ai.parser.interpretation.surplus_resolver import SurplusResolver
-from surplus_ai.parser.interpretation.type_inference import coerce, parse_money
+from surplus_ai.parser.interpretation.type_inference import (
+    coerce,
+    has_usable_case_identity,
+    parse_money,
+)
 from surplus_ai.parser.models import ParsedDocumentResult, RawRow, RawTable
 
 logger = structlog.get_logger(__name__)
@@ -167,6 +171,7 @@ class InterpretationPipeline:
                 row.extraction_method,
                 len(failures),
                 surplus_unresolved=surplus.source is SurplusSource.AMBIGUOUS,
+                identity_missing=not has_usable_case_identity(canonical),
             ),
             coercion_failures=tuple(failures),
         )

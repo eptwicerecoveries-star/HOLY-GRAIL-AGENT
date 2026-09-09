@@ -150,6 +150,8 @@ class RawRow(BaseModel):
     extraction_method: ExtractionMethod
     extraction_strategy: str
     confidence: float = Field(ge=0.0, le=1.0)
+    continuation_count: int = Field(ge=0, default=0)
+    continuation_sources: tuple[tuple[int, int], ...] = ()
 
 
 class RawTable(BaseModel):

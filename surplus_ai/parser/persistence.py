@@ -22,6 +22,7 @@ from surplus_ai.parser.interpretation.models import (
     InterpretedRow,
     RoutingDecision,
 )
+from surplus_ai.parser.interpretation.type_inference import has_usable_case_identity
 from surplus_ai.parser.models import ParsedDocumentResult
 from surplus_ai.utils.hashing import stable_row_hash
 
@@ -236,6 +237,11 @@ def review_reason(row: InterpretedRow, surplus_reason: str) -> str:
         )
     if row.surplus_source.value == "ambiguous":
         reasons.append(f"Surplus column could not be determined. {surplus_reason}")
+    if not has_usable_case_identity(row.canonical_values):
+        reasons.append(
+            "No usable case identity (case number, certificate number, unique id, "
+            "or a parcel-shaped identifier)."
+        )
     if row.coercion_failures:
         reasons.append("Values that could not be typed: " + "; ".join(row.coercion_failures))
     if not reasons:

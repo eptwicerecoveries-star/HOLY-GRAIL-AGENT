@@ -82,6 +82,25 @@ def looks_like_year(value: str) -> bool:
     return bool(YEAR_RE.match(value.strip()))
 
 
+def has_usable_case_identity(canonical: dict[CanonicalField, object]) -> bool:
+    """True when a row itself carries an identifier a person could use to find the case.
+
+    Table-level mapping confidence is not enough: a wrap line can sit under a perfectly
+    mapped header row and still name nobody. Alphabetic leftovers in a parcel column
+    do not count; `looks_like_parcel_id` requires a digit.
+    """
+    for field in (
+        CanonicalField.CASE_NUMBER,
+        CanonicalField.CERTIFICATE_NUMBER,
+        CanonicalField.UNIQUE_ID,
+    ):
+        value = canonical.get(field)
+        if value is not None and str(value).strip():
+            return True
+    parcel = canonical.get(CanonicalField.PARCEL_ID)
+    return parcel is not None and looks_like_parcel_identity(str(parcel))
+
+
 def looks_like_parcel_id(value: str) -> bool:
     """Identifier-shaped: alphanumeric with separators, and not purely alphabetic."""
     text = value.strip()
@@ -90,6 +109,24 @@ def looks_like_parcel_id(value: str) -> bool:
     if not PARCEL_RE.match(text):
         return False
     return any(c.isdigit() for c in text)
+
+
+def looks_like_parcel_identity(value: str) -> bool:
+    """Whether a value can identify a parcel, including compact digit STRAPs.
+
+    `looks_like_parcel_id` rejects long digit strings because they also match the money
+    pattern. A case identity check must still accept those published parcel numbers.
+    """
+    if looks_like_parcel_id(value):
+        return True
+    text = value.strip()
+    if len(text) < 6 or looks_like_date(text):
+        return False
+    if not any(c.isdigit() for c in text):
+        return False
+    if "$" in text or "." in text or "(" in text:
+        return False
+    return bool(PARCEL_RE.match(text))
 
 
 def looks_like_person_name(value: str) -> bool:

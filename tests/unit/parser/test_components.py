@@ -25,8 +25,11 @@ from surplus_ai.parser.stitching import TableStitcher
 from surplus_ai.parser.strategies.base import normalize_cell
 from surplus_ai.parser.strategies.word_cluster import (
     column_index_for,
+    extract_tables_from_word_pages,
     find_column_boundaries,
+    geometry_alignment_score,
     group_words_into_lines,
+    rows_from_words,
 )
 from surplus_ai.utils.exceptions import AppError
 
@@ -285,6 +288,89 @@ def test_stitching_preserves_true_page_numbers() -> None:
     assert pages == {1, 2}
 
 
+def test_headerless_continuation_reuses_prior_headers_and_keeps_first_data_row() -> None:
+    page1 = _table(
+        [
+            ["Tax Deed Number", "Sale Date", "Balance"],
+            ["2014001930", "9/30/2014", "508.74"],
+        ],
+        page=1,
+    )
+    page2 = _table(
+        [
+            ["2014000702", "10/7/2014", "1,768.73"],
+            ["2014001622", "1/13/2015", "1,328.92"],
+        ],
+        page=2,
+    )
+
+    stitched = TableStitcher().stitch([page1, page2])
+
+    assert len(stitched) == 1
+    assert stitched[0].header.headers == ("Tax Deed Number", "Sale Date", "Balance")
+    rows = [row for _, _, row in stitched[0].rows]
+    assert rows[0] == ("2014001930", "9/30/2014", "508.74")
+    assert rows[1] == ("2014000702", "10/7/2014", "1,768.73")
+    assert rows[2] == ("2014001622", "1/13/2015", "1,328.92")
+
+
+def test_incompatible_data_page_does_not_inherit_or_steal_parent() -> None:
+    """A wrong-width data page must not become the continuation parent."""
+    page1 = _table(
+        [
+            ["Tax Deed Number", "Sale Date", "Balance", "Owner Name"],
+            ["2014001930", "9/30/2014", "508.74", "SMITH JOHN"],
+        ],
+        page=1,
+    )
+    page2 = _table(
+        [
+            [
+                "2022001757",
+                "2/14/2023 22,843.06",
+                "11/20/2024",
+                "23 NW 18TH PL CAPE CORAL FL 33993",
+                "09-44-23-C3-03725.0060 LYL 509 LLC",
+                "6/30/2023",
+            ]
+        ],
+        page=2,
+    )
+    page3 = _table(
+        [
+            ["2024000125", "9/10/2024", "32,303.49", "CJC 431 ST LLC"],
+            ["2024000072", "9/10/2024", "8,294.58", "SMITH JANE"],
+        ],
+        page=3,
+    )
+
+    stitched = TableStitcher().stitch([page1, page2, page3])
+
+    parent = next(t for t in stitched if t.header.headers[0] == "Tax Deed Number")
+    parent_rows = [row for _, _, row in parent.rows]
+    assert ("2014001930", "9/30/2014", "508.74", "SMITH JOHN") in parent_rows
+    assert ("2024000125", "9/10/2024", "32,303.49", "CJC 431 ST LLC") in parent_rows
+    assert ("2024000072", "9/10/2024", "8,294.58", "SMITH JANE") in parent_rows
+    assert 1 in parent.page_numbers
+    assert 3 in parent.page_numbers
+    isolated = [t for t in stitched if t is not parent]
+    assert isolated
+    assert isolated[0].header.headers[0] != "Tax Deed Number"
+    assert isolated[0].header.headers != page1.rows[0]
+
+
+def test_later_table_with_own_valid_header_is_not_merged() -> None:
+    page1 = _table([["Parcel", "Owner"], ["01-1", "SMITH JOHN"]], page=1)
+    page2 = _table([["Account", "Taxpayer"], ["99-9", "JONES MARY"]], page=2)
+
+    stitched = TableStitcher().stitch([page1, page2])
+
+    assert len(stitched) == 2
+    assert stitched[0].header.headers == ("Parcel", "Owner")
+    assert stitched[1].header.headers == ("Account", "Taxpayer")
+    assert [row for _, _, row in stitched[1].rows] == [("99-9", "JONES MARY")]
+
+
 # --------------------------------------------------------------------------------------
 # word clustering
 # --------------------------------------------------------------------------------------
@@ -341,6 +427,251 @@ def test_column_index_assignment() -> None:
 
 def test_find_column_boundaries_handles_no_words() -> None:
     assert find_column_boundaries([], min_gap_width=6.0) == []
+
+
+# --------------------------------------------------------------------------------------
+# continuation-page column geometry
+# --------------------------------------------------------------------------------------
+
+# Eight logical bands. Neighbouring values can sit closer than min_gap_width and still
+# fall on opposite sides of a prior gutter.
+_GEOM_BOXES = (
+    (10.0, 40.0),
+    (60.0, 80.0),
+    (100.0, 120.0),
+    (140.0, 160.0),
+    (200.0, 280.0),
+    (330.0, 390.0),
+    (430.0, 530.0),
+    (570.0, 650.0),
+)
+_HEADER_8 = (
+    "Tax Deed Number",
+    "Sale Date",
+    "Balance",
+    "Balance Date",
+    "Property Address",
+    "Parcel ID",
+    "Owner Name",
+    "Expires",
+)
+_DATA_A = (
+    "2014001930",
+    "9/30/2014",
+    "508.74",
+    "6/26/2019",
+    "133 NAVAHO AVE",
+    "01452704000230050",
+    "TAHIR S ANSARI",
+    "1/1/2020",
+)
+_DATA_B = (
+    "2014000702",
+    "10/7/2014",
+    "1768.73",
+    "6/26/2019",
+    "ACCESS UNDETERMINED",
+    "09452704000160170",
+    "JONES MARY",
+    "2/2/2021",
+)
+_DATA_C = (
+    "2014001622",
+    "1/13/2015",
+    "1328.92",
+    "7/1/2019",
+    "2506 51ST ST",
+    "13452607000058014",
+    "SMITH JOHN",
+    "3/3/2022",
+)
+
+
+def _cells_at(top: float, texts: tuple[str, ...], boxes: tuple[tuple[float, float], ...] = _GEOM_BOXES) -> list[dict[str, float | str]]:
+    return [_word(text, x0, x1, top) for text, (x0, x1) in zip(texts, boxes, strict=True)]
+
+
+def _merge_boxes(left: int, right: int) -> tuple[tuple[float, float], ...]:
+    """Close the gutter between two adjacent logical columns so native clustering merges them."""
+    boxes = list(_GEOM_BOXES)
+    left_x0, _left_x1 = boxes[left]
+    _right_x0, right_x1 = boxes[right]
+    # One-point gap: narrower than DEFAULT_MIN_GAP_WIDTH, so it is not a native gutter.
+    mid = (boxes[left][1] + boxes[right][0]) / 2
+    boxes[left] = (left_x0, mid - 0.4)
+    boxes[right] = (mid + 0.4, right_x1)
+    return tuple(boxes)
+
+
+def test_header_page_establishes_eight_native_columns() -> None:
+    words = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    tables = extract_tables_from_word_pages([(1, words)])
+
+    assert len(tables) == 1
+    assert tables[0].column_count == 8
+    assert tables[0].rows[0] == _HEADER_8
+
+
+def test_continuation_recovers_eight_columns_when_native_merges_sale_and_balance() -> None:
+    """Logical columns 2+3 (Sale Date, Balance) sit closer than a native gutter."""
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    merged = _merge_boxes(1, 2)
+    continuation = (
+        _cells_at(10, _DATA_B, merged)
+        + _cells_at(30, _DATA_C, merged)
+        + _cells_at(50, _DATA_A, merged)
+    )
+    native_bounds = find_column_boundaries(continuation, min_gap_width=6.0)
+    assert len(native_bounds) + 1 == 7
+
+    tables = extract_tables_from_word_pages([(1, header_page), (2, continuation)])
+
+    assert len(tables) == 2
+    assert tables[1].column_count == 8
+    assert tables[1].rows[0] == _DATA_B
+    assert tables[1].rows[0][1] == "10/7/2014"
+    assert tables[1].rows[0][2] == "1768.73"
+
+
+def test_continuation_recovers_eight_columns_when_native_merges_parcel_and_owner() -> None:
+    """Logical columns 6+7 (Parcel ID, Owner Name) sit closer than a native gutter."""
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    merged = _merge_boxes(5, 6)
+    continuation = (
+        _cells_at(10, _DATA_C, merged)
+        + _cells_at(30, _DATA_A, merged)
+        + _cells_at(50, _DATA_B, merged)
+    )
+    native_bounds = find_column_boundaries(continuation, min_gap_width=6.0)
+    assert len(native_bounds) + 1 == 7
+
+    tables = extract_tables_from_word_pages([(1, header_page), (2, continuation)])
+
+    assert tables[1].column_count == 8
+    assert tables[1].rows[0] == _DATA_C
+    assert tables[1].rows[0][5] == "13452607000058014"
+    assert tables[1].rows[0][6] == "SMITH JOHN"
+
+
+def test_continuation_first_row_is_data_not_a_header() -> None:
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    continuation = _cells_at(10, _DATA_B) + _cells_at(30, _DATA_C) + _cells_at(50, _DATA_A)
+
+    tables = extract_tables_from_word_pages([(1, header_page), (2, continuation)])
+    stitched = TableStitcher().stitch(tables)
+
+    assert len(stitched) == 1
+    rows = [row for _, _, row in stitched[0].rows]
+    assert rows[0] == _DATA_A
+    assert rows[1] == _DATA_B
+    assert _DATA_B in rows
+    assert stitched[0].header.headers[0] == "Tax Deed Number"
+
+
+def test_prior_geometry_is_not_reused_when_x_alignment_is_weak() -> None:
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    # Three lines of a different two-column layout, far from the prior bands.
+    shifted = (
+        [_word("AA-1", 12, 40, 10), _word("SMITH", 80, 140, 10)]
+        + [_word("AA-2", 12, 40, 30), _word("JONES", 80, 140, 30)]
+        + [_word("AA-3", 12, 40, 50), _word("BROWN", 80, 140, 50)]
+        + [_word("AA-4", 12, 40, 70), _word("WHITE", 80, 140, 70)]
+    )
+    prior_bounds = find_column_boundaries(header_page, min_gap_width=6.0)
+    assert geometry_alignment_score(shifted, prior_bounds) < 0.85
+
+    tables = extract_tables_from_word_pages([(1, header_page), (2, shifted)])
+
+    assert tables[1].column_count != 8
+    assert tables[1].column_count == 2
+
+
+def test_prior_geometry_is_not_reused_for_a_new_labeled_table() -> None:
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    other_headers = (
+        "Account Number",
+        "Taxpayer Name",
+        "Mailing City",
+        "Mailing State",
+        "Site Street",
+        "Folio Number",
+        "Legal Owner",
+        "Filed Date",
+    )
+    other_page = (
+        _cells_at(10, other_headers)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+
+    tables = extract_tables_from_word_pages([(1, header_page), (2, other_page)])
+    stitched = TableStitcher().stitch(tables)
+
+    assert len(stitched) == 2
+    assert stitched[0].header.headers[0] == "Tax Deed Number"
+    assert stitched[1].header.headers[0] == "Account Number"
+    assert tables[1].rows[0] == other_headers
+
+
+def test_geometry_reuse_does_not_depend_on_page_number() -> None:
+    header_page = (
+        _cells_at(10, _HEADER_8)
+        + _cells_at(30, _DATA_A)
+        + _cells_at(50, _DATA_B)
+        + _cells_at(70, _DATA_C)
+    )
+    merged = _merge_boxes(1, 2)
+    continuation = (
+        _cells_at(10, _DATA_B, merged)
+        + _cells_at(30, _DATA_C, merged)
+        + _cells_at(50, _DATA_A, merged)
+    )
+
+    tables = extract_tables_from_word_pages([(20, header_page), (21, continuation)])
+
+    assert [t.page_number for t in tables] == [20, 21]
+    assert tables[1].column_count == 8
+    assert tables[1].rows[0] == _DATA_B
+
+
+def test_rows_from_words_keep_verbatim_cell_text() -> None:
+    words = _cells_at(10, _DATA_A) + _cells_at(30, _DATA_B) + _cells_at(50, _DATA_C)
+    bounds = find_column_boundaries(words, min_gap_width=6.0)
+    rows = rows_from_words(words, bounds)
+
+    assert rows[0][0] == "2014001930"
+    assert rows[0][2] == "508.74"
 
 
 # --------------------------------------------------------------------------------------

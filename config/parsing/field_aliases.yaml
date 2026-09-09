@@ -37,6 +37,7 @@ case_number:
   - court case number
   - docket number
   - civil action number
+  - tax deed number
 
 certificate_number:
   - certificate number

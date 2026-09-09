@@ -1,0 +1,35 @@
+# Lee County, Florida — Tax Deed Surplus Weekly Report (Clerk of Court).
+#
+# The weekly list is a bulk published surplus report. Research stays on the
+# default/manual path until a later slice separately approves automated access.
+# Do not point this county at a live property provider.
+
+county_name: Lee County
+state: FL
+
+# The Clerk labels the held figure "Balance". Bare "balance" is not a global
+# surplus term — it is too generic — so this county pins the published column.
+surplus_column: "Balance"
+
+column_overrides: {}
+derived_surplus: null
+
+fips_code: "12071"
+source_type: manual_upload
+source_url: https://www.leeclerk.org/departments/courts/property-sales/tax-deed-sales/tax-deed-reports
+publishing_frequency: weekly
+
+research:
+  property_provider: manual_lookup
+
+notes: >-
+  Official source is the Lee County Clerk of Court Tax Deed Surplus Weekly
+  Report published from leeclerk.org. The published Balance column is the
+  Clerk's reported figure still on account; it is evidence of a published
+  amount, not a determination of legal entitlement. The Clerk warns that
+  report balances do not indicate pending claims or litigation and may not
+  reflect all Clerk fees to be charged against the account. Lienholder Claim
+  Period Expires is a published date on the report and must not itself
+  determine entitlement or contact eligibility. Human verification remains
+  required before any outreach. Recurring automated download is not
+  enabled; files are ingested by manual upload until separately approved.

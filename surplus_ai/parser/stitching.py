@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import structlog
 
-from surplus_ai.parser.headers import HeaderReconstructor
+from surplus_ai.parser.headers import DEFAULT_MIN_HEADER_SCORE, HeaderReconstructor
 from surplus_ai.parser.models import ExtractedTable, HeaderDetection
+from surplus_ai.parser.quality import CURRENCY_RE, DATE_RE, IDENTIFIER_RE, INTEGER_RE, row_header_score
 
 logger = structlog.get_logger(__name__)
+
+# A continuation row whose cells are mostly dates, money, or identifiers is data, even
+# when header detection nominates it. Below this share the row may still be labels.
+_DATA_LIKE_SHARE = 0.4
 
 
 class StitchedTable:
@@ -39,10 +44,18 @@ class TableStitcher:
     out of the data. Getting the second case wrong inflates the row count by exactly the
     page count, which is why the corpus checks totals against each document's own declared
     parcel count.
+
+    A third failure is more subtle: header detection will nominate the first data row of a
+    continuation page, and if that page also has a different extracted column count it
+    must not become the continuation parent. Later compatible pages would then inherit
+    the fake header instead of the real one.
     """
 
     def __init__(self, reconstructor: HeaderReconstructor | None = None) -> None:
         self._reconstructor = reconstructor or HeaderReconstructor()
+        self._min_header_score = getattr(
+            self._reconstructor, "_min_header_score", DEFAULT_MIN_HEADER_SCORE
+        )
 
     def stitch(self, tables: list[ExtractedTable]) -> list[StitchedTable]:
         """Group page-level tables into logical tables, resolving header repetition."""
@@ -60,11 +73,24 @@ class TableStitcher:
                 continue
 
             if detection is None:
-                if current is not None:
+                if current is not None and self._column_count_compatible(current, table):
                     self._append_continuation(current, table, None)
                     continue
                 logger.warning(
                     "table_skipped_no_header", page=table.page_number, index=table.table_index
+                )
+                continue
+
+            if current is not None and not self._is_label_like(table, detection):
+                # Data-like nomination: do not let it become the continuation parent.
+                isolated = StitchedTable(len(stitched), detection)
+                self._append_continuation(isolated, table, None)
+                stitched.append(isolated)
+                logger.debug(
+                    "continuation_header_rejected",
+                    page=table.page_number,
+                    columns=table.column_count,
+                    parent_columns=len(current.header.headers),
                 )
                 continue
 
@@ -88,18 +114,36 @@ class TableStitcher:
     ) -> bool:
         """True when this page continues the table already in progress.
 
-        Matching column count is the deciding signal, deliberately without requiring the
-        page to carry a header. A headerless continuation page begins with a data row, and
-        header detection will happily nominate that row because data rows still score
-        moderately well as labels. Treating that nomination as evidence of a new table
-        would split one county's list in two and promote a real record into a header,
-        losing it. Column count is the stable property across a continued table.
+        Matching column count is required. A headerless continuation begins with a data
+        row, and header detection will often nominate that row because data still scores
+        moderately well as labels. That nomination is not evidence of a new table.
 
-        The trade-off is that two genuinely different tables with identical column counts
-        merge. That is the safer failure: the rows survive with their true page numbers and
-        can be separated later, whereas a promoted header row is data destroyed.
+        A later table with its own label-like header is a new table even at the same
+        width. Uncertain geometry fails closed: mismatched column counts do not inherit.
         """
+        if not self._column_count_compatible(current, table):
+            return False
+        if current.header.confidence < self._min_header_score:
+            return False
+        if detection is None:
+            return True
+        if _headers_match(detection.headers, current.header.headers):
+            return True
+        if self._is_label_like(table, detection):
+            return False
+        return True
+
+    def _column_count_compatible(self, current: StitchedTable, table: ExtractedTable) -> bool:
         return table.column_count == len(current.header.headers)
+
+    def _is_label_like(self, table: ExtractedTable, detection: HeaderDetection) -> bool:
+        """True when the nominated row looks like column labels rather than a data row."""
+        if detection.confidence < self._min_header_score:
+            return False
+        row = table.rows[detection.header_row_index]
+        if row_is_data_like(row):
+            return False
+        return row_header_score(row) >= self._min_header_score
 
     def _append_continuation(
         self,
@@ -116,7 +160,37 @@ class TableStitcher:
             # The page that first carried the header is not a repeat of it.
             if not establishing_page and table.page_number not in target.repeated_header_pages:
                 target.repeated_header_pages.append(table.page_number)
+        elif (
+            not establishing_page
+            and detection is not None
+            and not _headers_match(detection.headers, target.header.headers)
+            and not self._is_label_like(table, detection)
+        ):
+            # Nominated "header" is the first data row. Keep it as data.
+            start = 0
         target.add_page_rows(table.page_number, rows[start:], start)
+
+
+def row_is_data_like(row: tuple[str, ...]) -> bool:
+    """True when enough cells look like published values rather than labels."""
+    values = [cell.strip() for cell in row if cell.strip()]
+    if len(values) < 2:
+        return False
+    data_cells = sum(1 for value in values if _cell_looks_like_data(value))
+    return (data_cells / len(values)) >= _DATA_LIKE_SHARE
+
+
+def _cell_looks_like_data(cell: str) -> bool:
+    text = cell.strip()
+    if not text:
+        return False
+    if DATE_RE.search(text) or CURRENCY_RE.match(text):
+        return True
+    if INTEGER_RE.match(text) and len(text) >= 4:
+        return True
+    if IDENTIFIER_RE.match(text) and any(character.isdigit() for character in text):
+        return True
+    return False
 
 
 def _headers_match(left: tuple[str, ...], right: tuple[str, ...]) -> bool:

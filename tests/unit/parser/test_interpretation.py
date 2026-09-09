@@ -261,6 +261,42 @@ def test_value_inference_proposes_non_money_fields(interpreter: ColumnInterprete
     assert mappings[0].method is MappingMethod.VALUE_INFERENCE
 
 
+def test_named_non_sale_date_headers_are_not_inferred_as_sale_date(
+    interpreter: ColumnInterpreter,
+) -> None:
+    dates = ["1/1/2020", "2/2/2021", "3/3/2022", "4/4/2023"]
+
+    mappings = interpreter.interpret(
+        ("Balance Date", "Lienholder Claim Period Expires", "Sale Date"),
+        {
+            "Balance Date": dates,
+            "Lienholder Claim Period Expires": dates,
+            "Sale Date": dates,
+        },
+        ABSENT,
+    )
+
+    by_header = {m.original_header: m for m in mappings}
+    assert by_header["Balance Date"].canonical_field is None
+    assert by_header["Balance Date"].method is MappingMethod.UNRESOLVED
+    assert by_header["Lienholder Claim Period Expires"].canonical_field is None
+    assert by_header["Lienholder Claim Period Expires"].method is MappingMethod.UNRESOLVED
+    assert by_header["Sale Date"].canonical_field is CanonicalField.SALE_DATE
+    assert by_header["Sale Date"].method is MappingMethod.EXACT_ALIAS
+
+
+def test_tax_deed_number_maps_to_case_number(interpreter: ColumnInterpreter) -> None:
+    mappings = interpreter.interpret(
+        ("Tax Deed Number",),
+        {"Tax Deed Number": ["2014001930", "2014000702", "2014001622"]},
+        ABSENT,
+    )
+
+    assert mappings[0].canonical_field is CanonicalField.CASE_NUMBER
+    assert mappings[0].method is MappingMethod.EXACT_ALIAS
+    assert normalize_header("Tax Deed Number") == "tax deed number"
+
+
 def test_surplus_column_without_an_alias_maps_to_surplus_amount(
     interpreter: ColumnInterpreter,
 ) -> None:

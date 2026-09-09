@@ -8,6 +8,7 @@ from surplus_ai.parser.interpretation.alias_registry import (
     AliasRegistry,
     load_alias_registry,
     load_confidence_config,
+    normalize_header,
 )
 from surplus_ai.parser.interpretation.canonical import (
     MONEY_FIELDS,
@@ -34,6 +35,32 @@ KIND_DEFAULTS: dict[FieldKind, CanonicalField] = {
     FieldKind.PERSON: CanonicalField.OWNER_NAME,
     FieldKind.ADDRESS: CanonicalField.PROPERTY_ADDRESS,
 }
+
+# Whole-word tokens that mean a date column is not the sale date. Value inference
+# otherwise maps every unnamed date column to sale_date, which would collapse
+# "Balance Date" and a lienholder-expiration column into the sale.
+_NON_SALE_DATE_TOKENS = frozenset(
+    {
+        "balance",
+        "expire",
+        "expires",
+        "expiration",
+        "expired",
+        "deadline",
+        "recorded",
+        "recording",
+        "filed",
+        "filing",
+        "notice",
+        "lien",
+        "lienholder",
+        "claim",
+        "period",
+        "redemption",
+        "foreclosure",
+        "judgment",
+    }
+)
 
 
 class ColumnInterpreter:
@@ -157,6 +184,8 @@ class ColumnInterpreter:
             # Knowing a column holds money says nothing about which money it is, and the
             # costly error in this domain is calling the wrong figure a surplus.
             return None
+        if kind is FieldKind.DATE and _header_blocks_sale_date_inference(header):
+            return None
         field = KIND_DEFAULTS.get(kind)
         if field is None:
             return None
@@ -187,6 +216,12 @@ class ColumnInterpreter:
 
     def _confidence(self, method: MappingMethod) -> float:
         return self._method_confidence.get(method.value, 0.5)
+
+
+def _header_blocks_sale_date_inference(header: str) -> bool:
+    """True when the published label names a date that is not the sale date."""
+    tokens = set(normalize_header(header).split())
+    return bool(tokens & _NON_SALE_DATE_TOKENS)
 
 
 def money_fields_in(mappings: tuple[ColumnMapping, ...]) -> tuple[CanonicalField, ...]:

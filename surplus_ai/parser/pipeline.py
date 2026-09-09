@@ -20,6 +20,7 @@ from surplus_ai.parser.models import (
     RawTable,
 )
 from surplus_ai.parser.quality import score_tables
+from surplus_ai.parser.row_continuation import fold_stitched_rows
 from surplus_ai.parser.stitching import StitchedTable, TableStitcher
 from surplus_ai.parser.strategies.base import AbstractExtractionStrategy
 from surplus_ai.parser.strategies.ocr_table import OcrTableStrategy
@@ -219,22 +220,23 @@ class ParsingPipeline:
         method: ExtractionMethod,
     ) -> list[RawRow]:
         headers = logical.header.headers
+        folded = fold_stitched_rows(headers, logical.rows)
         rows: list[RawRow] = []
-        for page_number, row_index, cells in logical.rows:
-            if not any(cell.strip() for cell in cells):
-                continue
-            values = pair_cells_with_headers(headers, cells)
+        for item in folded:
+            values = pair_cells_with_headers(headers, item.cells)
             rows.append(
                 RawRow(
                     values=values,
                     source_pdf_path=profile.source_path,
                     source_pdf_sha256=profile.source_sha256,
-                    page_number=page_number,
+                    page_number=item.page_number,
                     table_index=logical.table_index,
-                    row_index_on_page=row_index,
+                    row_index_on_page=item.row_index_on_page,
                     extraction_method=method,
                     extraction_strategy=candidate.strategy,
                     confidence=candidate.quality_score,
+                    continuation_count=item.continuation_count,
+                    continuation_sources=item.continuation_sources,
                 )
             )
         return rows
@@ -277,9 +279,10 @@ class ParsingPipeline:
         covered: dict[int, set[str]] = {}
         for table in tables:
             for row in table.rows:
-                bucket = covered.setdefault(row.page_number, set())
-                for value in row.values.values():
-                    bucket.update(value.split())
+                tokens = {token for value in row.values.values() for token in value.split()}
+                covered.setdefault(row.page_number, set()).update(tokens)
+                for page_number, _index in row.continuation_sources:
+                    covered.setdefault(page_number, set()).update(tokens)
             for page_number in table.page_numbers:
                 covered.setdefault(page_number, set()).update(
                     token for header in table.original_headers for token in header.split()

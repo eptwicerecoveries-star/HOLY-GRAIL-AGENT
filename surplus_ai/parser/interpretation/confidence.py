@@ -52,10 +52,11 @@ class ConfidenceModel:
         extraction_method: ExtractionMethod,
         coercion_failures: int = 0,
         surplus_unresolved: bool = False,
+        identity_missing: bool = False,
     ) -> RoutingDecision:
         """Decide whether a row can be used unattended.
 
-        Two hard caps sit above the numeric score, because both describe failures a
+        Hard caps sit above the numeric score, because they describe failures a
         confidence value does not capture:
 
         OCR-derived rows never auto-accept however high they score. A misread digit in a
@@ -65,6 +66,9 @@ class ConfidenceModel:
         Rows whose surplus column could not be determined never auto-accept either. Every
         other field may have resolved perfectly, but the one figure the business exists to
         find is unknown, and a high score would otherwise present that row as ready to work.
+
+        Rows with no usable case identity never auto-accept. A wrap or footer line can
+        inherit a table's mapping confidence while naming no case.
         """
         if confidence < self._review:
             return RoutingDecision.QUARANTINE
@@ -72,6 +76,8 @@ class ConfidenceModel:
         if self._ocr_caps_at_review and extraction_method is ExtractionMethod.OCR:
             return RoutingDecision.REVIEW
         if surplus_unresolved:
+            return RoutingDecision.REVIEW
+        if identity_missing:
             return RoutingDecision.REVIEW
 
         return (

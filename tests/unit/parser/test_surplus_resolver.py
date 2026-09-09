@@ -214,6 +214,41 @@ def test_shipped_marion_config_pins_the_column_still_held() -> None:
     assert config.surplus_column == "Remaining Overbid"
 
 
+def test_bare_balance_is_not_a_global_surplus_term(resolver: SurplusResolver) -> None:
+    vocabulary = load_surplus_vocabulary()
+
+    assert not vocabulary.is_explicit("Balance")
+    assert not vocabulary.is_explicit("balance")
+    result = resolver.resolve(("Tax Deed Number", "Owner Name", "Balance"))
+    assert result.source is SurplusSource.ABSENT
+    assert result.source_column is None
+
+
+def test_lee_config_pins_balance_without_a_global_surplus_alias(
+    resolver: SurplusResolver,
+) -> None:
+    config = load_county_config("fl", "lee")
+    assert config is not None
+    assert config.surplus_column == "Balance"
+
+    result = resolver.resolve(
+        (
+            "Tax Deed Number",
+            "Sale Date",
+            "Balance",
+            "Balance Date",
+            "Property Address",
+            "Parcel ID",
+            "Owner Name",
+            "Lienholder Claim Period Expires",
+        ),
+        config,
+    )
+
+    assert result.source is SurplusSource.COUNTY_CONFIG
+    assert result.source_column == "Balance"
+
+
 # --------------------------------------------------------------------------------------
 # County configuration behaviour
 # --------------------------------------------------------------------------------------
