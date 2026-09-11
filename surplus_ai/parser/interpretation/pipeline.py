@@ -18,6 +18,7 @@ from surplus_ai.parser.interpretation.models import (
     SurplusSource,
 )
 from surplus_ai.parser.interpretation.surplus_resolver import SurplusResolver
+from surplus_ai.parser.interpretation.typed_cell_cleanup import apply_parcel_id_cell_cleanup
 from surplus_ai.parser.interpretation.type_inference import (
     coerce,
     has_usable_case_identity,
@@ -139,6 +140,9 @@ class InterpretationPipeline:
                 )
             canonical[mapping.canonical_field] = typed
 
+        cleanup = apply_parcel_id_cell_cleanup(canonical, mappings)
+        canonical.update(cleanup.updates)
+
         # Any column the header set did not cover -- overflow cells, for instance -- is
         # still carried through rather than dropped.
         for header, value in row.values.items():
@@ -172,8 +176,10 @@ class InterpretationPipeline:
                 len(failures),
                 surplus_unresolved=surplus.source is SurplusSource.AMBIGUOUS,
                 identity_missing=not has_usable_case_identity(canonical),
+                typed_cell_ambiguous=cleanup.ambiguous,
             ),
             coercion_failures=tuple(failures),
+            review_reasons=cleanup.review_reasons,
         )
 
     def _surplus_amount_for(self, row: RawRow, surplus: SurplusResolution) -> Decimal | None:

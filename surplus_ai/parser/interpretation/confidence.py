@@ -53,6 +53,7 @@ class ConfidenceModel:
         coercion_failures: int = 0,
         surplus_unresolved: bool = False,
         identity_missing: bool = False,
+        typed_cell_ambiguous: bool = False,
     ) -> RoutingDecision:
         """Decide whether a row can be used unattended.
 
@@ -69,6 +70,9 @@ class ConfidenceModel:
 
         Rows with no usable case identity never auto-accept. A wrap or footer line can
         inherit a table's mapping confidence while naming no case.
+
+        Rows whose typed identifier cell mixed a valid prefix with trailing text that
+        could not be peeled safely never auto-accept, even when a case number is present.
         """
         if confidence < self._review:
             return RoutingDecision.QUARANTINE
@@ -78,6 +82,8 @@ class ConfidenceModel:
         if surplus_unresolved:
             return RoutingDecision.REVIEW
         if identity_missing:
+            return RoutingDecision.REVIEW
+        if typed_cell_ambiguous:
             return RoutingDecision.REVIEW
 
         return (

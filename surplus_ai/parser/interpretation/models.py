@@ -111,6 +111,7 @@ class InterpretedRow(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     routing: RoutingDecision
     coercion_failures: tuple[str, ...] = ()
+    review_reasons: tuple[str, ...] = ()
 
     def value(self, field: CanonicalField) -> Decimal | date | str | None:
         return self.canonical_values.get(field)

@@ -22,6 +22,7 @@ from surplus_ai.parser.interpretation.models import (
     InterpretedRow,
     RoutingDecision,
 )
+from surplus_ai.parser.interpretation.typed_cell_cleanup import REVIEW_REASON_TYPED_CELL
 from surplus_ai.parser.interpretation.type_inference import has_usable_case_identity
 from surplus_ai.parser.models import ParsedDocumentResult
 from surplus_ai.utils.hashing import stable_row_hash
@@ -241,6 +242,11 @@ def review_reason(row: InterpretedRow, surplus_reason: str) -> str:
         reasons.append(
             "No usable case identity (case number, certificate number, unique id, "
             "or a parcel-shaped identifier)."
+        )
+    if REVIEW_REASON_TYPED_CELL in row.review_reasons:
+        reasons.append(
+            "A typed identifier cell mixed a valid prefix with trailing text that "
+            "could not be safely separated."
         )
     if row.coercion_failures:
         reasons.append("Values that could not be typed: " + "; ".join(row.coercion_failures))
